@@ -832,6 +832,78 @@ th {
   color: var(--muted);
 }
 
+.qa-subpanels {
+  margin-top: 18px;
+}
+
+.qa-subpanels h4 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: 0.98rem;
+}
+
+.qa-subpanels .section-head span {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.42;
+}
+
+.qa-subpanel-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.qa-subpanel-card {
+  padding: 14px;
+  border: 1px solid rgba(188, 174, 151, 0.78);
+  border-radius: 16px;
+  background: rgba(255, 252, 245, 0.76);
+}
+
+.qa-subpanel-card h5 {
+  margin: 0 0 10px;
+  font-family: "Fraunces", serif;
+  font-size: 0.96rem;
+}
+
+.qa-subpanel-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  aspect-ratio: 2148 / 1419;
+}
+
+.qa-subpanel-frame img {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 200%;
+  height: 200%;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  cursor: default;
+}
+
+.qa-subpanel-top-left img {
+  transform: translate(0, 0);
+}
+
+.qa-subpanel-top-right img {
+  transform: translate(-50%, 0);
+}
+
+.qa-subpanel-bottom-left img {
+  transform: translate(0, -50%);
+}
+
+.qa-subpanel-bottom-right img {
+  transform: translate(-50%, -50%);
+}
+
 .dataset-metrics {
   margin-top: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));

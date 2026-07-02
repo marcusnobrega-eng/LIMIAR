@@ -21,6 +21,13 @@ const STATUS_COLORS = {
   no_data: '#97A3A8',
 };
 
+const QA_PANEL_PARTS = [
+  { key: 'cross_section', className: 'qa-subpanel-top-left', col: 0, row: 0 },
+  { key: 'daily_exceedance', className: 'qa-subpanel-top-right', col: 1, row: 0 },
+  { key: 'rating_curve', className: 'qa-subpanel-bottom-left', col: 0, row: 1 },
+  { key: 'annual_maxima', className: 'qa-subpanel-bottom-right', col: 1, row: 1 },
+];
+
 const TEXT = {
   pt: {
     pageTitle: 'LIMIAR',
@@ -85,6 +92,8 @@ const TEXT = {
     allBasinsLabel: 'Todas',
     allBiomesLabel: 'Todos',
     qaPanelsLabel: 'Painéis QA',
+    qaSubpanelsTitle: 'Painéis individuais',
+    qaSubpanelsSubtitle: 'Seção transversal, registro diário, curva-chave e máximos anuais, um abaixo do outro.',
     noQaFlags: 'Nenhuma flag adicional registrada.',
     noQaPanel: 'Painel QA indisponível para esta estação.',
     emptyEvidence: 'Sem intervalos suficientes para resumir a evolução dos limiares nesta estação.',
@@ -174,6 +183,7 @@ const TEXT = {
       eventsSection: 'Eventos recentes e significativos',
       qaSection: 'Painel hidráulico e QA',
       qaCaption: 'Painel detalhado com seção observada, curva-chave, Q2 e contexto de máximos anuais.',
+      qaSubpanelsSection: 'Painéis hidráulicos individuais',
       fallbackImage: 'Painel hidráulico indisponível para esta estação.',
     },
     units: {
@@ -182,6 +192,12 @@ const TEXT = {
       days: 'dias',
     },
     qaFigureCaption: 'Painel da estação com a evidência hidráulica e os limiares usados na reconstrução.',
+    qaPanelParts: {
+      cross_section: 'Seção transversal, limiar principal e incerteza',
+      daily_exceedance: 'Registro diário e excedências de limiar',
+      rating_curve: 'Curva-chave e contexto hidráulico',
+      annual_maxima: 'Q2 e máximos anuais',
+    },
     emptyTimeseries: 'Sem série temporal disponível para esta estação.',
     emptySeasonality: 'Sem eventos suficientes para analisar sazonalidade nesta estação.',
     seasonalityNoEvents: 'Não foi possível derivar um padrão sazonal confiável para os eventos reconstruídos desta estação.',
@@ -290,6 +306,8 @@ const TEXT = {
     allBasinsLabel: 'All',
     allBiomesLabel: 'All',
     qaPanelsLabel: 'QA panels',
+    qaSubpanelsTitle: 'Individual panels',
+    qaSubpanelsSubtitle: 'Cross section, daily record, rating-curve context, and annual maxima shown one beneath the other.',
     noQaFlags: 'No additional flags recorded.',
     noQaPanel: 'QA panel not available for this station.',
     emptyEvidence: 'Not enough intervals are available to summarize threshold evolution for this station.',
@@ -379,6 +397,7 @@ const TEXT = {
       eventsSection: 'Recent and significant events',
       qaSection: 'Hydraulic panel and QA',
       qaCaption: 'Detailed panel with the observed cross section, rating-curve context, Q2, and annual-maxima evidence.',
+      qaSubpanelsSection: 'Individual hydraulic panels',
       fallbackImage: 'Hydraulic panel not available for this station.',
     },
     units: {
@@ -387,6 +406,12 @@ const TEXT = {
       days: 'days',
     },
     qaFigureCaption: 'Station panel with the hydraulic evidence and thresholds used in the reconstruction.',
+    qaPanelParts: {
+      cross_section: 'Cross section, main threshold, and uncertainty',
+      daily_exceedance: 'Daily record and threshold exceedances',
+      rating_curve: 'Rating-curve and hydraulic context',
+      annual_maxima: 'Q2 and annual maxima',
+    },
     emptyTimeseries: 'No time series is available for this station.',
     emptySeasonality: 'Not enough events are available to analyze seasonality for this station.',
     seasonalityNoEvents: 'No reliable seasonal pattern could be derived for reconstructed events at this station.',
@@ -591,6 +616,10 @@ function text(key) {
 
 function nestedText(group, key) {
   return TEXT[state.lang][group][key];
+}
+
+function qaPanelPartLabel(key) {
+  return TEXT[state.lang].qaPanelParts?.[key] || key;
 }
 
 function showToast(message, duration = 2200) {
@@ -1173,7 +1202,7 @@ function applyStaticTranslations() {
     'stationTabButton', 'datasetTabButton', 'exportReportButton', 'metadataTitle', 'timeseriesTitle',
     'evidenceTitle', 'evidenceSubtitle', 'eventSummaryTitle', 'seasonalityTitle', 'seasonalitySubtitle', 'recentEventsTitle', 'qaTitle', 'datasetTotalsTitle', 'statusTotalsTitle',
     'howToReadTitle', 'howToReadText', 'caveatTitle', 'caveatText', 'thStartDate', 'thPeakDate', 'thDuration',
-    'thPeak', 'thClass', 'imageOverlayTitle',
+    'thPeak', 'thClass', 'imageOverlayTitle', 'qaSubpanelsTitle', 'qaSubpanelsSubtitle',
   ];
   keys.forEach((id) => {
     const node = byId(id);
@@ -1943,6 +1972,8 @@ function renderQaSection(stationData) {
   const caption = byId('qaImageCaption');
   const fallback = byId('qaImageFallback');
   const openButton = byId('openQaImageButton');
+  const subpanelsNode = byId('qaSubpanels');
+  const subpanelList = byId('qaSubpanelList');
   if (stationData.qa.panel_png) {
     img.src = stationData.qa.panel_png;
     img.hidden = false;
@@ -1953,6 +1984,15 @@ function renderQaSection(stationData) {
     fallback.hidden = true;
     byId('imageOverlayImg').src = stationData.qa.panel_png;
     byId('imageOverlayCaption').textContent = text('qaFigureCaption');
+    subpanelList.innerHTML = QA_PANEL_PARTS.map((panel) => `
+      <article class="qa-subpanel-card">
+        <h5>${qaPanelPartLabel(panel.key)}</h5>
+        <div class="qa-subpanel-frame ${panel.className}">
+          <img src="${stationData.qa.panel_png}" alt="${qaPanelPartLabel(panel.key)}" loading="lazy" />
+        </div>
+      </article>
+    `).join('');
+    subpanelsNode.hidden = false;
   } else {
     img.hidden = true;
     caption.hidden = true;
@@ -1961,6 +2001,8 @@ function renderQaSection(stationData) {
     fallback.hidden = false;
     byId('imageOverlayImg').removeAttribute('src');
     byId('imageOverlayCaption').textContent = text('noQaPanel');
+    subpanelList.innerHTML = '';
+    subpanelsNode.hidden = true;
   }
 }
 
@@ -1988,6 +2030,8 @@ function renderEmptySelection() {
   byId('qaImageCaption').hidden = true;
   byId('openQaImageButton').hidden = true;
   byId('qaImageFallback').textContent = '-';
+  byId('qaSubpanels').hidden = true;
+  byId('qaSubpanelList').innerHTML = '';
 }
 
 async function selectStation(stationCode) {
@@ -2088,10 +2132,39 @@ async function dataUrlToUint8Array(dataUrl) {
   return bytes;
 }
 
-async function fetchImageBytes(path) {
-  const response = await fetch(path);
-  if (!response.ok) return null;
-  return new Uint8Array(await response.arrayBuffer());
+async function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Could not load image: ${src}`));
+    image.src = src;
+  });
+}
+
+async function cropImageRectToBytes(image, x, y, width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.drawImage(image, x, y, width, height, 0, 0, width, height);
+  return dataUrlToUint8Array(canvas.toDataURL('image/png', 1));
+}
+
+async function buildQaPanelPartImages(src) {
+  const image = await loadImageElement(src);
+  const halfWidth = Math.floor(image.naturalWidth / 2);
+  const halfHeight = Math.floor(image.naturalHeight / 2);
+  return Promise.all(QA_PANEL_PARTS.map(async (panel) => ({
+    ...panel,
+    title: qaPanelPartLabel(panel.key),
+    bytes: await cropImageRectToBytes(
+      image,
+      panel.col * halfWidth,
+      panel.row * halfHeight,
+      halfWidth,
+      halfHeight,
+    ),
+  })));
 }
 
 async function exportStationReport() {
@@ -2109,7 +2182,7 @@ async function exportStationReport() {
     renderEvidenceChart(state.selectedData);
     const chartBytes = await chartToBytes('timeseriesChart', 1800, 900);
     const evidenceBytes = await chartToBytes('evidenceChart', 1700, 860);
-    const qaBytes = state.selectedData.qa.panel_png ? await fetchImageBytes(state.selectedData.qa.panel_png) : null;
+    const qaPanelParts = state.selectedData.qa.panel_png ? await buildQaPanelPartImages(state.selectedData.qa.panel_png) : [];
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
     const docEvents = normalizedEventRows(state.selectedData).slice(0, 8);
@@ -2234,17 +2307,27 @@ async function exportStationReport() {
               pageBreakBefore: true,
             }),
             new docx.Paragraph(qaFlagsText),
-            ...(qaBytes ? [
-              new docx.Paragraph({
-                alignment: docx.AlignmentType.CENTER,
-                children: [
-                  new docx.ImageRun({
-                    data: qaBytes,
-                    transformation: { width: 640, height: 415 },
-                  }),
-                ],
-              }),
+            ...(qaPanelParts.length ? [
               new docx.Paragraph(TEXT[state.lang].report.qaCaption),
+              new docx.Paragraph({
+                text: TEXT[state.lang].report.qaSubpanelsSection,
+                heading: docx.HeadingLevel.HEADING_2,
+              }),
+              ...qaPanelParts.flatMap((panel) => [
+                new docx.Paragraph({
+                  text: panel.title,
+                  heading: docx.HeadingLevel.HEADING_3,
+                }),
+                new docx.Paragraph({
+                  alignment: docx.AlignmentType.CENTER,
+                  children: [
+                    new docx.ImageRun({
+                      data: panel.bytes,
+                      transformation: { width: 620, height: 410 },
+                    }),
+                  ],
+                }),
+              ]),
             ] : [new docx.Paragraph(TEXT[state.lang].report.fallbackImage)]),
             new docx.Paragraph({
               text: TEXT[state.lang].report.eventsSection,
