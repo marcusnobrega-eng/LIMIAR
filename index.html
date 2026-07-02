@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LIMIAR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css?v=3" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#">
+        <span class="brand-mark" aria-hidden="true">
+          <img src="assets/limiar-logo.svg" alt="" />
+        </span>
+        <span class="brand-copy">
+          <strong id="brandTitle">LIMIAR</strong>
+          <small id="brandSubtitle">Levels and Indicators for Monitoring Inundation Across Rivers</small>
+        </span>
+      </a>
+      <div class="topbar-controls">
+        <label class="date-control">
+          <span id="dateLabel">Data</span>
+          <input id="datePicker" type="date" />
+        </label>
+        <div class="language-switch" role="group" aria-label="Language switch">
+          <button type="button" class="lang-button active" data-lang="pt">PT</button>
+          <button type="button" class="lang-button" data-lang="en">EN</button>
+        </div>
+        <button class="toolbar-button" id="theoryButton" type="button">Como funciona</button>
+        <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
+        <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
+        <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="sidebar">
+        <section class="hero-card">
+          <span class="eyebrow" id="eyebrowLabel">Atlas histórico e de triagem</span>
+          <h1 id="heroTitle">Busca diária de estações com sinais de inundação</h1>
+          <p id="heroText">
+            Selecione uma data para ver quais estações estão em condição normal, em alerta, inundadas ou em inundação extrema.
+          </p>
+        </section>
+
+        <section class="fatal-card" id="fatalState" hidden>
+          <h2 id="fatalTitle">Erro de carregamento</h2>
+          <p id="fatalMessage">Não foi possível carregar os arquivos do atlas.</p>
+          <pre id="fatalCommand" hidden>python3 -m http.server 8000</pre>
+        </section>
+
+        <section class="stats-grid" aria-label="Dataset totals">
+          <article class="stat-card stat-stations">
+            <span id="statStationsLabel">Estações publicadas</span>
+            <strong id="statStations">-</strong>
+          </article>
+          <article class="stat-card stat-range">
+            <span id="statRangeLabel">Período</span>
+            <strong id="statRange">-</strong>
+          </article>
+          <article class="stat-card stat-latest">
+            <span id="statLatestLabel">Última data</span>
+            <strong id="statLatest">-</strong>
+          </article>
+        </section>
+
+        <section class="control-card">
+          <div class="control-head">
+            <h2 id="filtersTitle">Filtros</h2>
+            <span id="visibleCount">-</span>
+          </div>
+          <label>
+            <span id="searchLabel">Busca</span>
+            <input id="stationSearch" type="search" class="search-input" placeholder="Código, nome, UF, município, bacia" />
+          </label>
+          <div class="filter-grid">
+            <label>
+              <span id="statusFilterLabel">Status</span>
+              <select id="statusFilter">
+                <option value="all">Todos</option>
+              </select>
+            </label>
+            <label>
+              <span id="basisFilterLabel">Base do limiar</span>
+              <select id="basisFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label>
+              <span id="qaFilterLabel">Classe QA</span>
+              <select id="qaFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label>
+              <span id="ufFilterLabel">UF</span>
+              <select id="ufFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label class="filter-span-2">
+              <span id="basinFilterLabel">Bacia</span>
+              <select id="basinFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label class="filter-span-2">
+              <span id="biomeFilterLabel">Bioma</span>
+              <select id="biomeFilter">
+                <option value="all">Todos</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="station-list-card">
+          <div class="control-head">
+            <h2 id="stationListTitle">Estações</h2>
+            <span id="listCount">-</span>
+          </div>
+          <div class="station-list" id="stationList"></div>
+        </section>
+      </aside>
+
+      <section class="map-stage">
+        <div id="map"></div>
+        <section class="floating-card selected-card">
+          <span class="eyebrow" id="selectedStatusEyebrow">Status da data</span>
+          <h2 id="selectedStatusTitle">Selecione uma estação</h2>
+          <p id="selectedStatusSubtitle">-</p>
+            <div class="selected-metrics">
+            <div>
+              <span id="selectedMetricStatusLabel">Status</span>
+              <strong id="selectedMetricStatus">-</strong>
+            </div>
+            <div>
+              <span id="selectedMetricBasisLabel">Base</span>
+              <strong id="selectedMetricBasis">-</strong>
+            </div>
+            <div>
+              <span id="selectedMetricQaLabel">Incerteza</span>
+              <strong id="selectedMetricQa">-</strong>
+            </div>
+          </div>
+        </section>
+        <section class="floating-card legend-card">
+          <span class="eyebrow" id="legendTitle">Legenda</span>
+          <div class="legend-items" id="legendItems"></div>
+        </section>
+      </section>
+
+      <aside class="detail-panel">
+        <div class="tabbar">
+          <button class="active" type="button" data-panel="stationPanel" id="stationTabButton">Estação</button>
+          <button type="button" data-panel="datasetPanel" id="datasetTabButton">Conjunto</button>
+        </div>
+
+        <section id="stationPanel" class="panel-view active">
+          <div class="panel-head">
+            <div>
+              <h2 id="stationHeading">Estação</h2>
+              <p id="stationSubheading">-</p>
+            </div>
+            <button class="download-button" id="exportReportButton" type="button">Exportar DOCX</button>
+          </div>
+
+          <section class="status-card">
+            <div class="status-badges" id="statusBadges"></div>
+            <div class="status-grid" id="statusGrid"></div>
+          </section>
+
+          <section class="metadata-card">
+            <div class="section-head">
+              <h3 id="metadataTitle">Metadados e limiares</h3>
+            </div>
+            <dl class="metadata-grid" id="metadataGrid"></dl>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="timeseriesTitle">Série temporal principal</h3>
+                <span id="timeseriesSubtitle">-</span>
+              </div>
+              <div class="range-buttons" role="group" aria-label="Time range">
+                <button type="button" class="range-button active" data-range="90">90d</button>
+                <button type="button" class="range-button" data-range="365">365d</button>
+                <button type="button" class="range-button" data-range="full">Registro completo</button>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-empty" id="timeseriesEmpty" hidden>Sem série temporal disponível para esta estação.</div>
+              <canvas id="timeseriesChart" height="260"></canvas>
+            </div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="evidenceTitle">Evolução dos limiares e máximos anuais</h3>
+                <span id="evidenceSubtitle">Mudanças de limiar ao longo do registro, com máximos anuais observados</span>
+              </div>
+            </div>
+            <p class="evidence-summary" id="evidenceSummary">-</p>
+            <div class="chart-wrap evidence-wrap">
+              <div class="chart-empty" id="evidenceEmpty" hidden>Sem intervalos suficientes para resumir a evolução dos limiares nesta estação.</div>
+              <canvas id="evidenceChart" height="240"></canvas>
+            </div>
+          </section>
+
+          <section class="event-card">
+            <div class="section-head">
+              <h3 id="eventSummaryTitle">Resumo de eventos</h3>
+            </div>
+            <div class="event-metrics" id="eventMetrics"></div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="seasonalityTitle">Sazonalidade dos eventos</h3>
+                <span id="seasonalitySubtitle">Picos de eventos reconstruídos ao longo do ano</span>
+              </div>
+            </div>
+            <p class="seasonality-summary" id="seasonalitySummary">-</p>
+            <div class="chart-wrap seasonality-wrap">
+              <div class="chart-empty" id="seasonalityEmpty" hidden>Sem eventos suficientes para analisar sazonalidade nesta estação.</div>
+              <canvas id="seasonalityChart" height="180"></canvas>
+            </div>
+          </section>
+
+          <section class="event-card">
+            <div class="section-head">
+              <h3 id="recentEventsTitle">Eventos recentes e significativos</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th id="thStartDate">Início</th>
+                    <th id="thPeakDate">Pico</th>
+                    <th id="thDuration">Duração</th>
+                    <th id="thPeak">Pico</th>
+                    <th id="thClass">Classe</th>
+                  </tr>
+                </thead>
+                <tbody id="eventTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="qa-card">
+            <div class="section-head">
+              <h3 id="qaTitle">Incerteza e painel da estação</h3>
+            </div>
+            <div class="qa-overview" id="qaOverview"></div>
+            <ul class="qa-flags" id="qaFlags"></ul>
+            <div class="qa-image-wrap">
+              <div class="qa-image-shell">
+                <img id="qaImage" alt="Painel QA da estação" hidden />
+              </div>
+              <button class="toolbar-button image-expand-button" id="openQaImageButton" type="button" hidden>Ampliar figura</button>
+              <p id="qaImageCaption" hidden>-</p>
+              <p id="qaImageFallback">-</p>
+            </div>
+          </section>
+        </section>
+
+        <section id="datasetPanel" class="panel-view">
+          <section class="dataset-card">
+            <div class="section-head">
+              <h3 id="datasetTotalsTitle">Totais do conjunto</h3>
+            </div>
+            <div class="dataset-metrics" id="datasetMetrics"></div>
+          </section>
+
+          <section class="dataset-card">
+            <div class="section-head">
+              <h3 id="statusTotalsTitle">Totais da data selecionada</h3>
+            </div>
+            <div class="dataset-metrics" id="statusTotals"></div>
+          </section>
+
+          <section class="dataset-card prose-card">
+            <div class="section-head">
+              <h3 id="howToReadTitle">Como interpretar</h3>
+            </div>
+            <p id="howToReadText">
+              O atlas distingue limiares hidráulicos observados de limiares Q2 de alta vazão. Os estados de alerta e severidade usam retornos estatísticos quando disponíveis.
+            </p>
+          </section>
+
+          <section class="dataset-card prose-card caution-card">
+            <div class="section-head">
+              <h3 id="caveatTitle">Caveat científico</h3>
+            </div>
+            <p id="caveatText">
+              Este é um atlas histórico de triagem e reconstrução. Ele não representa um sistema operacional em tempo real nem substitui validação hidrológica local.
+            </p>
+          </section>
+        </section>
+      </aside>
+    </main>
+
+    <div class="overlay" id="theoryOverlay" hidden>
+      <div class="overlay-backdrop" data-overlay-close="theoryOverlay"></div>
+      <section class="overlay-panel theory-panel" role="dialog" aria-modal="true" aria-labelledby="theoryTitle">
+        <button class="overlay-close" id="closeTheoryButton" type="button" aria-label="Fechar">&times;</button>
+        <span class="eyebrow" id="theoryEyebrow">Como o atlas funciona</span>
+        <h2 id="theoryTitle">Teoria e fluxo de reconstrução</h2>
+        <div id="theoryBody"></div>
+      </section>
+    </div>
+
+    <div class="overlay" id="imageOverlay" hidden>
+      <div class="overlay-backdrop" data-overlay-close="imageOverlay"></div>
+      <section class="overlay-panel image-panel" role="dialog" aria-modal="true" aria-labelledby="imageOverlayTitle">
+        <button class="overlay-close" id="closeImageButton" type="button" aria-label="Fechar">&times;</button>
+        <h2 id="imageOverlayTitle">Painel hidráulico detalhado</h2>
+        <img id="imageOverlayImg" alt="Painel hidráulico ampliado" />
+        <p id="imageOverlayCaption">-</p>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/chartjs/chart.umd.min.js"></script>
+    <script src="vendor/docx/index.umd.js"></script>
+    <script src="app.js?v=3"></script>
+  </body>
+</html>
