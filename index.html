@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=8" />
+    <link rel="stylesheet" href="styles.css?v=11" />
   </head>
   <body>
     <header class="topbar">
@@ -187,7 +187,10 @@
               <h2 id="stationHeading">Estação</h2>
               <p id="stationSubheading">-</p>
             </div>
-            <button class="download-button" id="exportReportButton" type="button">Exportar DOCX</button>
+            <div class="panel-actions">
+              <button class="toolbar-button" id="exportStationDataButton" type="button">Baixar dados CSV</button>
+              <button class="download-button" id="exportReportButton" type="button">Exportar DOCX</button>
+            </div>
           </div>
 
           <section class="status-card">
@@ -208,10 +211,13 @@
                 <h3 id="timeseriesTitle">Série temporal principal</h3>
                 <span id="timeseriesSubtitle">-</span>
               </div>
-              <div class="range-buttons" role="group" aria-label="Time range">
-                <button type="button" class="range-button active" data-range="90">90d</button>
-                <button type="button" class="range-button" data-range="365">365d</button>
-                <button type="button" class="range-button" data-range="full">Registro completo</button>
+              <div class="section-actions">
+                <div class="range-buttons" role="group" aria-label="Time range">
+                  <button type="button" class="range-button active" data-range="90">90d</button>
+                  <button type="button" class="range-button" data-range="365">365d</button>
+                  <button type="button" class="range-button" data-range="full">Registro completo</button>
+                </div>
+                <button class="toolbar-button section-button" id="exportTimeseriesCsvButton" type="button">Baixar CSV</button>
               </div>
             </div>
             <div class="chart-wrap">
@@ -226,6 +232,7 @@
                 <h3 id="crossSectionTitle">Evolução das seções transversais</h3>
                 <span id="crossSectionSubtitle">Levantamentos representativos e faixa de incerteza do limiar hidráulico</span>
               </div>
+              <button class="toolbar-button section-button" id="exportCrossSectionCsvButton" type="button">Baixar CSV</button>
             </div>
             <div class="chart-wrap">
               <div class="chart-empty" id="crossSectionEmpty" hidden>Sem seções transversais representativas para esta estação.</div>
@@ -239,6 +246,7 @@
                 <h3 id="dynamicDailyTitle">Registro completo com limiar dinâmico</h3>
                 <span id="dynamicDailySubtitle">Série inteira com o limiar ativo em cada intervalo e picos reconstruídos</span>
               </div>
+              <button class="toolbar-button section-button" id="exportDynamicDailyCsvButton" type="button">Baixar CSV</button>
             </div>
             <div class="chart-wrap">
               <div class="chart-empty" id="dynamicDailyEmpty" hidden>Sem registro dinâmico suficiente para esta estação.</div>
@@ -252,6 +260,7 @@
                 <h3 id="ratingCurveTitle">Contexto da curva-chave e do Q2</h3>
                 <span id="ratingCurveSubtitle">Curvas válidas ao longo do tempo e pontos de limiar por intervalo dinâmico</span>
               </div>
+              <button class="toolbar-button section-button" id="exportRatingCurveCsvButton" type="button">Baixar CSV</button>
             </div>
             <div class="chart-wrap">
               <div class="chart-empty" id="ratingCurveEmpty" hidden>Sem curvas-chave suficientes para reconstruir este painel.</div>
@@ -265,6 +274,7 @@
                 <h3 id="evidenceTitle">Evolução dos limiares e máximos anuais</h3>
                 <span id="evidenceSubtitle">Mudanças de limiar ao longo do registro, com máximos anuais observados</span>
               </div>
+              <button class="toolbar-button section-button" id="exportEvidenceCsvButton" type="button">Baixar CSV</button>
             </div>
             <p class="evidence-summary" id="evidenceSummary">-</p>
             <div class="chart-wrap evidence-wrap">
@@ -286,6 +296,7 @@
                 <h3 id="seasonalityTitle">Sazonalidade dos eventos</h3>
                 <span id="seasonalitySubtitle">Picos de eventos reconstruídos ao longo do ano</span>
               </div>
+              <button class="toolbar-button section-button" id="exportSeasonalityCsvButton" type="button">Baixar CSV</button>
             </div>
             <p class="seasonality-summary" id="seasonalitySummary">-</p>
             <div class="chart-wrap seasonality-wrap">
@@ -297,6 +308,7 @@
           <section class="event-card">
             <div class="section-head">
               <h3 id="recentEventsTitle">Eventos recentes e significativos</h3>
+              <button class="toolbar-button section-button" id="exportEventsCsvButton" type="button">Baixar CSV</button>
             </div>
             <div class="table-wrap">
               <table>
@@ -321,12 +333,12 @@
             <div class="qa-overview" id="qaOverview"></div>
             <ul class="qa-flags" id="qaFlags"></ul>
             <div class="qa-image-wrap">
-              <div class="qa-image-shell">
+              <div class="qa-image-shell" id="qaImageShell">
                 <img id="qaImage" alt="Painel QA da estação" hidden />
               </div>
               <button class="toolbar-button image-expand-button" id="openQaImageButton" type="button" hidden>Ampliar figura</button>
               <p id="qaImageCaption" hidden>-</p>
-              <p id="qaImageFallback">-</p>
+              <p id="qaImageFallback" hidden></p>
             </div>
             <div class="qa-subpanels" id="qaSubpanels" hidden>
               <div class="section-head">
@@ -350,9 +362,23 @@
 
           <section class="dataset-card">
             <div class="section-head">
+              <h3 id="sampleDescriptionTitle">Descrição da amostra</h3>
+            </div>
+            <div class="dataset-metrics" id="sampleMetrics"></div>
+          </section>
+
+          <section class="dataset-card">
+            <div class="section-head">
               <h3 id="statusTotalsTitle">Totais da data selecionada</h3>
             </div>
             <div class="dataset-metrics" id="statusTotals"></div>
+          </section>
+
+          <section class="dataset-card prose-card">
+            <div class="section-head">
+              <h3 id="datasetBreakdownTitle">Cobertura e distribuição</h3>
+            </div>
+            <div class="dataset-breakdown" id="datasetBreakdown"></div>
           </section>
 
           <section class="dataset-card prose-card">
@@ -369,7 +395,7 @@
               <h3 id="caveatTitle">Caveat científico</h3>
             </div>
             <p id="caveatText">
-              Este é um atlas histórico de triagem e reconstrução. Ele não representa um sistema operacional em tempo real nem substitui validação hidrológica local.
+              Este atlas mostra um retrato histórico para análise. Não é um sistema de alerta em tempo real e não substitui a avaliação local.
             </p>
           </section>
         </section>
@@ -411,6 +437,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=11"></script>
   </body>
 </html>
