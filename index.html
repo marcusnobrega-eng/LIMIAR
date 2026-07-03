@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=8" />
   </head>
   <body>
     <header class="topbar">
@@ -22,15 +22,25 @@
         </span>
       </a>
       <div class="topbar-controls">
-        <label class="date-control">
-          <span id="dateLabel">Data</span>
-          <input id="datePicker" type="date" />
-        </label>
+        <div class="date-navigator" role="group" aria-labelledby="dateLabel">
+          <button class="date-step-button" id="prevDateButton" type="button" aria-label="Dia anterior" title="Dia anterior">
+            <span aria-hidden="true">&larr;</span>
+          </button>
+          <label class="date-control">
+            <span id="dateLabel">Data</span>
+            <input id="datePicker" type="date" />
+            <input id="dateScrubber" class="date-scrubber" type="range" min="0" max="0" value="0" step="1" aria-label="Controle de rolagem da data" />
+          </label>
+          <button class="date-step-button" id="nextDateButton" type="button" aria-label="Próximo dia" title="Próximo dia">
+            <span aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
         <div class="language-switch" role="group" aria-label="Language switch">
           <button type="button" class="lang-button active" data-lang="pt">PT</button>
           <button type="button" class="lang-button" data-lang="en">EN</button>
         </div>
         <button class="toolbar-button" id="theoryButton" type="button">Como funciona</button>
+        <button class="toolbar-button" id="layersButton" type="button">Camadas</button>
         <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
         <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
         <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
@@ -97,6 +107,18 @@
               </select>
             </label>
             <label>
+              <span id="crossSectionFilterLabel">Seção transversal</span>
+              <select id="crossSectionFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label>
+              <span id="ratingCurveFilterLabel">Curva-chave</span>
+              <select id="ratingCurveFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+            <label>
               <span id="ufFilterLabel">UF</span>
               <select id="ufFilter">
                 <option value="all">Todas</option>
@@ -128,7 +150,7 @@
 
       <section class="map-stage">
         <div id="map"></div>
-        <section class="floating-card selected-card">
+        <section class="floating-card selected-card" id="selectedCard">
           <span class="eyebrow" id="selectedStatusEyebrow">Status da data</span>
           <h2 id="selectedStatusTitle">Selecione uma estação</h2>
           <p id="selectedStatusSubtitle">-</p>
@@ -147,7 +169,7 @@
             </div>
           </div>
         </section>
-        <section class="floating-card legend-card">
+        <section class="floating-card legend-card" id="legendCard">
           <span class="eyebrow" id="legendTitle">Legenda</span>
           <div class="legend-items" id="legendItems"></div>
         </section>
@@ -195,6 +217,45 @@
             <div class="chart-wrap">
               <div class="chart-empty" id="timeseriesEmpty" hidden>Sem série temporal disponível para esta estação.</div>
               <canvas id="timeseriesChart" height="260"></canvas>
+            </div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="crossSectionTitle">Evolução das seções transversais</h3>
+                <span id="crossSectionSubtitle">Levantamentos representativos e faixa de incerteza do limiar hidráulico</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-empty" id="crossSectionEmpty" hidden>Sem seções transversais representativas para esta estação.</div>
+              <canvas id="crossSectionChart" height="260"></canvas>
+            </div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="dynamicDailyTitle">Registro completo com limiar dinâmico</h3>
+                <span id="dynamicDailySubtitle">Série inteira com o limiar ativo em cada intervalo e picos reconstruídos</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-empty" id="dynamicDailyEmpty" hidden>Sem registro dinâmico suficiente para esta estação.</div>
+              <canvas id="dynamicDailyChart" height="260"></canvas>
+            </div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-head">
+              <div>
+                <h3 id="ratingCurveTitle">Contexto da curva-chave e do Q2</h3>
+                <span id="ratingCurveSubtitle">Curvas válidas ao longo do tempo e pontos de limiar por intervalo dinâmico</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-empty" id="ratingCurveEmpty" hidden>Sem curvas-chave suficientes para reconstruir este painel.</div>
+              <canvas id="ratingCurveChart" height="260"></canvas>
             </div>
           </section>
 
@@ -325,6 +386,16 @@
       </section>
     </div>
 
+    <div class="overlay" id="layersOverlay" hidden>
+      <div class="overlay-backdrop" data-overlay-close="layersOverlay"></div>
+      <section class="overlay-panel layers-panel" role="dialog" aria-modal="true" aria-labelledby="layersTitle">
+        <button class="overlay-close" id="closeLayersButton" type="button" aria-label="Fechar">&times;</button>
+        <span class="eyebrow" id="layersEyebrow">Mapa</span>
+        <h2 id="layersTitle">Mapa base e camadas visíveis</h2>
+        <div id="layersBody"></div>
+      </section>
+    </div>
+
     <div class="overlay" id="imageOverlay" hidden>
       <div class="overlay-backdrop" data-overlay-close="imageOverlay"></div>
       <section class="overlay-panel image-panel" role="dialog" aria-modal="true" aria-labelledby="imageOverlayTitle">
@@ -340,6 +411,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=8"></script>
   </body>
 </html>

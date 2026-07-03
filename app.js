@@ -34,7 +34,11 @@ const TEXT = {
     brandTitle: 'LIMIAR',
     brandSubtitle: 'Levels and Indicators for Monitoring Inundation Across Rivers',
     dateLabel: 'Data',
+    previousDateLabel: 'Dia anterior',
+    nextDateLabel: 'Próximo dia',
+    dateScrubberLabel: 'Controle de rolagem da data',
     theoryButton: 'Como funciona',
+    layersButton: 'Camadas',
     fitMapButton: 'Ajustar mapa',
     exportCsvButton: 'Exportar CSV',
     shareButton: 'Compartilhar',
@@ -50,6 +54,8 @@ const TEXT = {
     statusFilterLabel: 'Status',
     basisFilterLabel: 'Tipo de limiar',
     qaFilterLabel: 'Uso recomendado',
+    crossSectionFilterLabel: 'Seção transversal',
+    ratingCurveFilterLabel: 'Curva-chave',
     ufFilterLabel: 'UF',
     basinFilterLabel: 'Bacia',
     biomeFilterLabel: 'Bioma',
@@ -68,6 +74,12 @@ const TEXT = {
     exportReportButton: 'Exportar DOCX',
     metadataTitle: 'Metadados e limiares',
     timeseriesTitle: 'Série temporal principal',
+    crossSectionTitle: 'Evolução das seções transversais',
+    crossSectionSubtitle: 'Seções observadas e faixa de incerteza do limiar hidráulico',
+    dynamicDailyTitle: 'Registro completo com limiar dinâmico',
+    dynamicDailySubtitle: 'Série inteira com o limiar ativo em cada intervalo e picos reconstruídos',
+    ratingCurveTitle: 'Contexto da curva-chave e do Q2',
+    ratingCurveSubtitle: 'Curvas válidas ao longo do tempo e pontos de limiar por intervalo dinâmico',
     evidenceTitle: 'Evolução dos limiares e máximos anuais',
     evidenceSubtitle: 'Mudanças de limiar ao longo do registro, com máximos anuais observados',
     eventSummaryTitle: 'Resumo de eventos',
@@ -95,9 +107,23 @@ const TEXT = {
     qaSubpanelsTitle: 'Painéis individuais',
     qaSubpanelsSubtitle: 'Seção transversal, registro diário, curva-chave e máximos anuais, um abaixo do outro.',
     noQaFlags: 'Nenhuma flag adicional registrada.',
-    noQaPanel: 'Painel QA indisponível para esta estação.',
+    noQaPanel: 'Painel QA pré-renderizado indisponível neste pacote para esta estação. Os gráficos interativos acima continuam disponíveis.',
     emptyEvidence: 'Sem intervalos suficientes para resumir a evolução dos limiares nesta estação.',
     legendPointNote: 'Todos os pontos têm o mesmo tamanho. A cor mostra a classe do dia.',
+    layersEyebrow: 'Mapa',
+    layersTitle: 'Mapa base e camadas visíveis',
+    layersBaseTitle: 'Mapa base',
+    layersVisibleTitle: 'Elementos visíveis',
+    baseOsm: 'OpenStreetMap padrão',
+    baseOsmText: 'Base mais simples, com menos relevo visual e leitura mais direta.',
+    baseTopo: 'Relevo e drenagem',
+    baseTopoText: 'Mostra relevo/topografia com mais destaque visual.',
+    layerStations: 'Estações',
+    layerStationsText: 'Mostra os pontos das estações filtradas no mapa.',
+    layerSummary: 'Resumo flutuante',
+    layerSummaryText: 'Mostra o cartão com a estação selecionada sobre o mapa.',
+    layerLegend: 'Legenda',
+    layerLegendText: 'Mostra a legenda de classes e cores no canto do mapa.',
     imageExpandButton: 'Ampliar figura',
     imageOverlayTitle: 'Painel hidráulico detalhado',
     closeLabel: 'Fechar',
@@ -124,6 +150,11 @@ const TEXT = {
       screening_ok: 'Pronto para uso',
       manual_review_medium: 'Conferir painel',
       manual_review_high: 'Checar com cuidado',
+    },
+    hydraulicAvailability: {
+      all: 'Todas',
+      yes: 'Com evidência',
+      no: 'Sem evidência',
     },
     legend: {
       normal: 'Normal',
@@ -174,17 +205,25 @@ const TEXT = {
       title: 'Relatório técnico da estação',
       summarySection: 'Resumo da estação',
       methodSection: 'Como interpretar esta estação',
-      methodText: 'O LIMIAR compara o valor diário observado com os limiares de alerta, inundação e severidade. Sempre que existe evidência hidráulica observada, ela é priorizada; quando não existe, o atlas usa o Q2 estatístico como referência de inundação. Este produto é histórico e de triagem, não um sistema operacional em tempo real.',
+      methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. Quando existe evidência hidráulica observada, ela define o limiar principal de inundação; quando não existe, o atlas usa o Q2 estatístico como fallback. Este produto é histórico e de triagem, não um sistema operacional em tempo real.',
       statusSection: 'Situação na data selecionada',
       chartSection: 'Série temporal principal',
       chartCaption: 'Registro diário observado com a data selecionada e os limiares aplicados.',
+      crossSectionSection: 'Evolução das seções transversais',
+      crossSectionCaption: 'Seções transversais observadas da estação, com linha mediana do limiar hidráulico e faixa de incerteza entre os percentis 10 e 90.',
+      dynamicDailySection: 'Registro completo com limiar dinâmico',
+      dynamicDailyCaption: 'Série completa da estação com o limiar ativo em cada intervalo e os picos dos eventos reconstruídos.',
+      ratingCurveSection: 'Curva-chave e contexto do Q2',
+      ratingCurveCaption: 'Curvas válidas ao longo do registro, pontos de limiar por intervalo dinâmico e referência vertical do Q2.',
       evidenceSection: 'Evolução de limiares e máximos anuais',
       evidenceCaption: 'Máximos anuais observados comparados com os limiares vigentes em cada período. Marcadores indicam anos com atualização de seção transversal.',
-      eventsSection: 'Eventos recentes e significativos',
+      seasonalitySection: 'Sazonalidade dos eventos',
+      seasonalityCaption: 'Distribuição dos meses de pico dos eventos reconstruídos, usada para resumir a concentração sazonal da estação.',
+      eventsSection: 'Todos os eventos reconstruídos da estação',
       qaSection: 'Painel hidráulico e QA',
       qaCaption: 'Painel detalhado com seção observada, curva-chave, Q2 e contexto de máximos anuais.',
       qaSubpanelsSection: 'Painéis hidráulicos individuais',
-      fallbackImage: 'Painel hidráulico indisponível para esta estação.',
+      fallbackImage: 'Painel QA pré-renderizado indisponível neste pacote para esta estação.',
     },
     units: {
       stage_cm: 'cm',
@@ -199,6 +238,9 @@ const TEXT = {
       annual_maxima: 'Q2 e máximos anuais',
     },
     emptyTimeseries: 'Sem série temporal disponível para esta estação.',
+    emptyCrossSection: 'Sem seções transversais observadas para esta estação.',
+    emptyDynamicDaily: 'Sem registro dinâmico suficiente para esta estação.',
+    emptyRatingCurve: 'Sem curvas-chave suficientes para reconstruir este painel.',
     emptySeasonality: 'Sem eventos suficientes para analisar sazonalidade nesta estação.',
     seasonalityNoEvents: 'Não foi possível derivar um padrão sazonal confiável para os eventos reconstruídos desta estação.',
     theory: {
@@ -248,7 +290,11 @@ const TEXT = {
     brandTitle: 'LIMIAR',
     brandSubtitle: 'Levels and Indicators for Monitoring Inundation Across Rivers',
     dateLabel: 'Date',
+    previousDateLabel: 'Previous day',
+    nextDateLabel: 'Next day',
+    dateScrubberLabel: 'Date scroll control',
     theoryButton: 'How it works',
+    layersButton: 'Layers',
     fitMapButton: 'Fit map',
     exportCsvButton: 'Export CSV',
     shareButton: 'Share',
@@ -264,6 +310,8 @@ const TEXT = {
     statusFilterLabel: 'Status',
     basisFilterLabel: 'Threshold type',
     qaFilterLabel: 'Recommended use',
+    crossSectionFilterLabel: 'Cross section',
+    ratingCurveFilterLabel: 'Rating curve',
     ufFilterLabel: 'State',
     basinFilterLabel: 'Basin',
     biomeFilterLabel: 'Biome',
@@ -282,6 +330,12 @@ const TEXT = {
     exportReportButton: 'Export DOCX',
     metadataTitle: 'Metadata and thresholds',
     timeseriesTitle: 'Primary time series',
+    crossSectionTitle: 'Cross-section evolution',
+    crossSectionSubtitle: 'Observed cross sections and the uncertainty band around the hydraulic threshold',
+    dynamicDailyTitle: 'Full record with dynamic threshold',
+    dynamicDailySubtitle: 'Whole-station series with the active threshold for each interval and reconstructed peaks',
+    ratingCurveTitle: 'Rating-curve and Q2 context',
+    ratingCurveSubtitle: 'Valid curves through time and interval-level threshold points',
     evidenceTitle: 'Threshold evolution and annual maxima',
     evidenceSubtitle: 'Threshold changes through the record, with observed annual maxima',
     eventSummaryTitle: 'Event summary',
@@ -309,9 +363,23 @@ const TEXT = {
     qaSubpanelsTitle: 'Individual panels',
     qaSubpanelsSubtitle: 'Cross section, daily record, rating-curve context, and annual maxima shown one beneath the other.',
     noQaFlags: 'No additional flags recorded.',
-    noQaPanel: 'QA panel not available for this station.',
+    noQaPanel: 'The pre-rendered QA panel is not available for this station in the current package. The interactive charts above remain available.',
     emptyEvidence: 'Not enough intervals are available to summarize threshold evolution for this station.',
     legendPointNote: 'All points use the same size. Color shows the selected-day class.',
+    layersEyebrow: 'Map',
+    layersTitle: 'Basemap and visible layers',
+    layersBaseTitle: 'Basemap',
+    layersVisibleTitle: 'Visible elements',
+    baseOsm: 'Standard OpenStreetMap',
+    baseOsmText: 'Cleaner default basemap with less visual relief.',
+    baseTopo: 'Relief and drainage',
+    baseTopoText: 'Highlights terrain/topography more strongly.',
+    layerStations: 'Stations',
+    layerStationsText: 'Show filtered station markers on the map.',
+    layerSummary: 'Floating summary',
+    layerSummaryText: 'Show the selected-station summary card over the map.',
+    layerLegend: 'Legend',
+    layerLegendText: 'Show the class/color legend in the map corner.',
     imageExpandButton: 'Expand figure',
     imageOverlayTitle: 'Detailed hydraulic panel',
     closeLabel: 'Close',
@@ -338,6 +406,11 @@ const TEXT = {
       screening_ok: 'Ready to use',
       manual_review_medium: 'Check panel',
       manual_review_high: 'Review carefully',
+    },
+    hydraulicAvailability: {
+      all: 'All',
+      yes: 'Available',
+      no: 'Unavailable',
     },
     legend: {
       normal: 'Normal',
@@ -388,17 +461,25 @@ const TEXT = {
       title: 'Station technical brief',
       summarySection: 'Station summary',
       methodSection: 'How to interpret this station',
-      methodText: 'LIMIAR compares the observed daily value against the alert, flood, and severe thresholds. Whenever observed hydraulic evidence exists, it is prioritized; where it does not, the atlas uses statistical Q2 as the flood reference. This is a historical screening product, not a real-time operational warning system.',
+      methodText: 'LIMIAR compares the observed daily value against the thresholds valid for that period. Whenever observed hydraulic evidence exists, it defines the primary flood threshold; where it does not, the atlas uses statistical Q2 as a fallback. This is a historical screening product, not a real-time operational warning system.',
       statusSection: 'Selected-day conditions',
       chartSection: 'Primary time series',
       chartCaption: 'Observed daily record with the selected day and the thresholds applied to that period.',
+      crossSectionSection: 'Cross-section evolution',
+      crossSectionCaption: 'Observed station cross sections with the median hydraulic threshold and the 10th to 90th percentile uncertainty band.',
+      dynamicDailySection: 'Full record with dynamic threshold',
+      dynamicDailyCaption: 'Whole-station series with the active threshold in each interval and reconstructed event peaks.',
+      ratingCurveSection: 'Rating-curve and Q2 context',
+      ratingCurveCaption: 'Valid curves through time, interval-level threshold points, and the vertical Q2 reference.',
       evidenceSection: 'Threshold evolution and annual maxima',
       evidenceCaption: 'Observed annual maxima compared with the thresholds in force for each period. Markers show years with cross-section updates.',
-      eventsSection: 'Recent and significant events',
+      seasonalitySection: 'Event seasonality',
+      seasonalityCaption: 'Distribution of reconstructed event peak months, used to summarize the station seasonal concentration.',
+      eventsSection: 'All reconstructed station events',
       qaSection: 'Hydraulic panel and QA',
       qaCaption: 'Detailed panel with the observed cross section, rating-curve context, Q2, and annual-maxima evidence.',
       qaSubpanelsSection: 'Individual hydraulic panels',
-      fallbackImage: 'Hydraulic panel not available for this station.',
+      fallbackImage: 'The pre-rendered QA panel is not available for this station in the current package.',
     },
     units: {
       stage_cm: 'cm',
@@ -413,6 +494,9 @@ const TEXT = {
       annual_maxima: 'Q2 and annual maxima',
     },
     emptyTimeseries: 'No time series is available for this station.',
+    emptyCrossSection: 'No observed cross sections are available for this station.',
+    emptyDynamicDaily: 'There is not enough dynamic record support for this station.',
+    emptyRatingCurve: 'There are not enough rating curves to rebuild this panel.',
     emptySeasonality: 'Not enough events are available to analyze seasonality for this station.',
     seasonalityNoEvents: 'No reliable seasonal pattern could be derived for reconstructed events at this station.',
     theory: {
@@ -578,6 +662,8 @@ const MONTH_LABELS = {
   en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 };
 
+const DEFAULT_STATION_CODE = '83250000';
+
 const state = {
   lang: 'pt',
   manifest: null,
@@ -594,6 +680,27 @@ const state = {
   charts: {},
   markersLayer: null,
   currentRange: '90',
+  basemap: 'osm',
+  baseLayers: {},
+  mapVisibility: {
+    stations: true,
+    summary: true,
+    legend: true,
+  },
+  dateScrubberTimer: null,
+};
+
+const BASEMAP_DEFS = {
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18,
+  },
+  topo: {
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap',
+    maxZoom: 17,
+  },
 };
 
 const map = L.map('map', {
@@ -601,10 +708,13 @@ const map = L.map('map', {
   zoomControl: true,
 }).setView([-14.5, -52.5], 4);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 18,
-}).addTo(map);
+Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
+  state.baseLayers[key] = L.tileLayer(config.url, {
+    attribution: config.attribution,
+    maxZoom: config.maxZoom,
+  });
+});
+state.baseLayers[state.basemap].addTo(map);
 
 function byId(id) {
   return document.getElementById(id);
@@ -620,6 +730,103 @@ function nestedText(group, key) {
 
 function qaPanelPartLabel(key) {
   return TEXT[state.lang].qaPanelParts?.[key] || key;
+}
+
+function isFiniteNumber(value) {
+  return value != null && Number.isFinite(Number(value));
+}
+
+function curveKey(curveId, segmentId) {
+  return `${curveId || ''}||${segmentId || ''}`;
+}
+
+function quantileFromSorted(values, q) {
+  if (!values.length) return null;
+  if (values.length === 1) return values[0];
+  const pos = (values.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  const lower = values[base];
+  const upper = values[Math.min(base + 1, values.length - 1)];
+  return lower + rest * (upper - lower);
+}
+
+function ratingDischarge(stageCm, coefficientA, coefficientH0, coefficientN) {
+  const stageM = Number(stageCm) / 100;
+  const baseM = stageM - Number(coefficientH0);
+  if (!Number.isFinite(baseM) || baseM <= 0 || !Number.isFinite(Number(coefficientA)) || !Number.isFinite(Number(coefficientN))) {
+    return null;
+  }
+  return Number(coefficientA) * (baseM ** Number(coefficientN));
+}
+
+function ratingStageFromDischarge(dischargeM3s, coefficientA, coefficientH0, coefficientN) {
+  const discharge = Number(dischargeM3s);
+  if (discharge <= 0 || !Number.isFinite(discharge) || !Number.isFinite(Number(coefficientA)) || Number(coefficientA) <= 0 || !Number.isFinite(Number(coefficientN)) || Number(coefficientN) <= 0) {
+    return null;
+  }
+  const stageM = Number(coefficientH0) + ((discharge / Number(coefficientA)) ** (1 / Number(coefficientN)));
+  return stageM * 100;
+}
+
+function latestRatingCurve(stationData) {
+  const curves = (stationData.hydraulic?.ratingCurves || []).filter((curve) =>
+    curve
+    && isFiniteNumber(curve.coefficientA)
+    && isFiniteNumber(curve.coefficientH0)
+    && isFiniteNumber(curve.coefficientN)
+  );
+  if (!curves.length) return null;
+  return curves.slice().sort((left, right) => {
+    const leftKey = left.validTo || left.validFrom || `${left.year || 0}`;
+    const rightKey = right.validTo || right.validFrom || `${right.year || 0}`;
+    return String(leftKey).localeCompare(String(rightKey));
+  }).at(-1);
+}
+
+function crossSectionBand(stationData) {
+  const values = stationData.intervalsHydrated
+    .map((interval) => (interval.valueType === 'stage_cm' ? Number(interval.flood) : null))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (!values.length) return null;
+  return {
+    low: quantileFromSorted(values, 0.1),
+    median: quantileFromSorted(values, 0.5),
+    high: quantileFromSorted(values, 0.9),
+  };
+}
+
+const CURVE_COLORS = ['#2d1e3f', '#4f2a6b', '#72358c', '#98438a', '#bd537d', '#de6b68', '#f08d5e', '#f7b267'];
+
+const thresholdBandPlugin = {
+  id: 'thresholdBand',
+  beforeDatasetsDraw(chart, _args, options) {
+    if (!options || !options.enabled || !chart.scales?.y || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const low = Number(options.low);
+    const high = Number(options.high);
+    const median = Number(options.median);
+    if (!Number.isFinite(low) || !Number.isFinite(high) || !Number.isFinite(median)) return;
+    const y1 = scales.y.getPixelForValue(high);
+    const y2 = scales.y.getPixelForValue(low);
+    const ym = scales.y.getPixelForValue(median);
+    ctx.save();
+    ctx.fillStyle = 'rgba(208, 75, 69, 0.12)';
+    ctx.fillRect(chartArea.left, Math.min(y1, y2), chartArea.right - chartArea.left, Math.abs(y2 - y1));
+    ctx.strokeStyle = '#8f1d21';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([7, 4]);
+    ctx.beginPath();
+    ctx.moveTo(chartArea.left, ym);
+    ctx.lineTo(chartArea.right, ym);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
+if (window.Chart?.register) {
+  window.Chart.register(thresholdBandPlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -686,6 +893,82 @@ function renderTheoryModal() {
   `;
 }
 
+function setBasemap(key) {
+  if (!state.baseLayers[key] || state.basemap === key) return;
+  map.removeLayer(state.baseLayers[state.basemap]);
+  state.basemap = key;
+  state.baseLayers[key].addTo(map);
+}
+
+function applyMapVisibility() {
+  const selectedCard = byId('selectedCard');
+  const legendCard = byId('legendCard');
+  if (selectedCard) selectedCard.hidden = !state.mapVisibility.summary;
+  if (legendCard) legendCard.hidden = !state.mapVisibility.legend;
+  renderMap();
+}
+
+function renderLayersModal() {
+  const body = byId('layersBody');
+  if (!body) return;
+  byId('layersEyebrow').textContent = text('layersEyebrow');
+  byId('layersTitle').textContent = text('layersTitle');
+  body.innerHTML = `
+    <div class="layers-grid">
+      <section class="layers-group">
+        <h3>${text('layersBaseTitle')}</h3>
+        <label class="layer-option">
+          <input type="radio" name="basemapChoice" value="osm" ${state.basemap === 'osm' ? 'checked' : ''} />
+          <span>
+            <strong>${text('baseOsm')}</strong>
+            <small>${text('baseOsmText')}</small>
+          </span>
+        </label>
+        <label class="layer-option">
+          <input type="radio" name="basemapChoice" value="topo" ${state.basemap === 'topo' ? 'checked' : ''} />
+          <span>
+            <strong>${text('baseTopo')}</strong>
+            <small>${text('baseTopoText')}</small>
+          </span>
+        </label>
+      </section>
+      <section class="layers-group">
+        <h3>${text('layersVisibleTitle')}</h3>
+        <label class="layer-option">
+          <input type="checkbox" data-layer-visibility="stations" ${state.mapVisibility.stations ? 'checked' : ''} />
+          <span>
+            <strong>${text('layerStations')}</strong>
+            <small>${text('layerStationsText')}</small>
+          </span>
+        </label>
+        <label class="layer-option">
+          <input type="checkbox" data-layer-visibility="summary" ${state.mapVisibility.summary ? 'checked' : ''} />
+          <span>
+            <strong>${text('layerSummary')}</strong>
+            <small>${text('layerSummaryText')}</small>
+          </span>
+        </label>
+        <label class="layer-option">
+          <input type="checkbox" data-layer-visibility="legend" ${state.mapVisibility.legend ? 'checked' : ''} />
+          <span>
+            <strong>${text('layerLegend')}</strong>
+            <small>${text('layerLegendText')}</small>
+          </span>
+        </label>
+      </section>
+    </div>
+  `;
+  body.querySelectorAll('input[name="basemapChoice"]').forEach((input) => {
+    input.addEventListener('change', () => setBasemap(input.value));
+  });
+  body.querySelectorAll('[data-layer-visibility]').forEach((input) => {
+    input.addEventListener('change', () => {
+      state.mapVisibility[input.dataset.layerVisibility] = input.checked;
+      applyMapVisibility();
+    });
+  });
+}
+
 function showFatalState(message = text('fatalMessage'), showCommand = false) {
   const card = byId('fatalState');
   const title = byId('fatalTitle');
@@ -736,9 +1019,16 @@ function formatNumber(value, digits = 0) {
   });
 }
 
-function formatPercent(value, digits = 1) {
+function formatPercent(value, digits = 2) {
   if (value === null || value === undefined || value === '') return '-';
-  return `${formatNumber(Number(value) * 100, digits)}%`;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '-';
+  const scaled = numeric * 100;
+  const rounded = Number(scaled.toFixed(digits));
+  const minStep = 1 / (10 ** digits);
+  if (numeric > 0 && numeric < 1 && rounded >= 100) return `>${formatNumber(100 - minStep, digits)}%`;
+  if (numeric > 0 && rounded <= 0) return `<${formatNumber(minStep, digits)}%`;
+  return `${formatNumber(scaled, digits)}%`;
 }
 
 function formatDate(value) {
@@ -905,16 +1195,22 @@ function eventSignature(event) {
 }
 
 function normalizedEventRows(stationData) {
+  const allRows = stationData.all_events || [];
   const recentRows = stationData.recent_events || [];
   const significantRows = stationData.significant_events || [];
+  const significantById = new Map(significantRows.filter((event) => event?.event_id).map((event) => [event.event_id, event]));
   const significantBySignature = new Map(significantRows.map((event) => [eventSignature(event), event]));
-  const sourceRows = recentRows.length ? recentRows : significantRows;
+  const sourceRows = allRows.length ? allRows : (recentRows.length ? recentRows : significantRows);
   const seen = new Set();
   return sourceRows
     .map((event) => ({
       ...event,
       event_start: findEventStart(event, stationData.recent_events),
-      display_class: eventClassLabel(significantBySignature.get(eventSignature(event)) || event),
+      display_class: eventClassLabel(
+        significantById.get(event.event_id)
+        || significantBySignature.get(eventSignature(event))
+        || event,
+      ),
     }))
     .filter((event) => {
       const key = [
@@ -1134,6 +1430,27 @@ async function renderChartConfigToBytes(config, width, height) {
     responsive: false,
     maintainAspectRatio: false,
   };
+  if (exportConfig.options?.plugins?.legend?.labels) {
+    exportConfig.options.plugins.legend.labels.font = {
+      ...(exportConfig.options.plugins.legend.labels.font || {}),
+      size: 18,
+    };
+  }
+  Object.values(exportConfig.options?.scales || {}).forEach((scale) => {
+    if (scale?.ticks) {
+      scale.ticks.font = {
+        ...(scale.ticks.font || {}),
+        size: 18,
+      };
+    }
+    if (scale?.title?.display) {
+      scale.title.font = {
+        ...(scale.title.font || {}),
+        size: 20,
+        weight: '600',
+      };
+    }
+  });
   const chart = new Chart(canvas.getContext('2d'), exportConfig);
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   const bytes = await dataUrlToUint8Array(canvas.toDataURL('image/png', 1));
@@ -1194,12 +1511,13 @@ function getStatusInfo(stationCode, dateString) {
 
 function applyStaticTranslations() {
   const keys = [
-    'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'fitMapButton', 'exportCsvButton', 'shareButton',
+    'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
-    'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'ufFilterLabel',
-    'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
+    'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
+    'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
     'selectedMetricStatusLabel', 'selectedMetricBasisLabel', 'selectedMetricQaLabel', 'legendTitle',
     'stationTabButton', 'datasetTabButton', 'exportReportButton', 'metadataTitle', 'timeseriesTitle',
+    'crossSectionTitle', 'crossSectionSubtitle', 'dynamicDailyTitle', 'dynamicDailySubtitle', 'ratingCurveTitle', 'ratingCurveSubtitle',
     'evidenceTitle', 'evidenceSubtitle', 'eventSummaryTitle', 'seasonalityTitle', 'seasonalitySubtitle', 'recentEventsTitle', 'qaTitle', 'datasetTotalsTitle', 'statusTotalsTitle',
     'howToReadTitle', 'howToReadText', 'caveatTitle', 'caveatText', 'thStartDate', 'thPeakDate', 'thDuration',
     'thPeak', 'thClass', 'imageOverlayTitle', 'qaSubpanelsTitle', 'qaSubpanelsSubtitle',
@@ -1209,6 +1527,21 @@ function applyStaticTranslations() {
     if (node) node.textContent = text(id);
   });
   byId('stationSearch').placeholder = text('searchPlaceholder');
+  const prevDateButton = byId('prevDateButton');
+  const nextDateButton = byId('nextDateButton');
+  const dateScrubber = byId('dateScrubber');
+  if (prevDateButton) {
+    prevDateButton.setAttribute('aria-label', text('previousDateLabel'));
+    prevDateButton.setAttribute('title', text('previousDateLabel'));
+  }
+  if (nextDateButton) {
+    nextDateButton.setAttribute('aria-label', text('nextDateLabel'));
+    nextDateButton.setAttribute('title', text('nextDateLabel'));
+  }
+  if (dateScrubber) {
+    dateScrubber.setAttribute('aria-label', text('dateScrubberLabel'));
+    dateScrubber.setAttribute('title', text('dateScrubberLabel'));
+  }
   const fullRangeButton = document.querySelector('.range-button[data-range="full"]');
   if (fullRangeButton) fullRangeButton.textContent = text('fullRecordLabel');
   const fatalTitle = byId('fatalTitle');
@@ -1217,6 +1550,12 @@ function applyStaticTranslations() {
   if (fatalMessage && !byId('fatalState')?.hidden) fatalMessage.textContent = text('fatalMessage');
   const emptyChart = byId('timeseriesEmpty');
   if (emptyChart) emptyChart.textContent = text('emptyTimeseries');
+  const emptyCrossSection = byId('crossSectionEmpty');
+  if (emptyCrossSection) emptyCrossSection.textContent = text('emptyCrossSection');
+  const emptyDynamicDaily = byId('dynamicDailyEmpty');
+  if (emptyDynamicDaily) emptyDynamicDaily.textContent = text('emptyDynamicDaily');
+  const emptyRatingCurve = byId('ratingCurveEmpty');
+  if (emptyRatingCurve) emptyRatingCurve.textContent = text('emptyRatingCurve');
   const emptyEvidence = byId('evidenceEmpty');
   if (emptyEvidence) emptyEvidence.textContent = text('emptyEvidence');
   const emptySeasonality = byId('seasonalityEmpty');
@@ -1229,7 +1568,10 @@ function applyStaticTranslations() {
   const imageClose = byId('closeImageButton');
   if (theoryClose) theoryClose.setAttribute('aria-label', text('closeLabel'));
   if (imageClose) imageClose.setAttribute('aria-label', text('closeLabel'));
+  const layersClose = byId('closeLayersButton');
+  if (layersClose) layersClose.setAttribute('aria-label', text('closeLabel'));
   renderTheoryModal();
+  renderLayersModal();
   document.title = text('pageTitle');
   document.documentElement.lang = state.lang === 'pt' ? 'pt-BR' : 'en';
 }
@@ -1244,14 +1586,74 @@ function statusOptionValues() {
   return ['all', 'normal', 'warning', 'flooded', 'extreme_flooding', 'no_data'];
 }
 
+function buildDateStepButton(id, arrowEntity) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.id = id;
+  button.className = 'date-step-button';
+  const icon = document.createElement('span');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = arrowEntity;
+  button.appendChild(icon);
+  return button;
+}
+
+function buildDateScrubber() {
+  const scrubber = document.createElement('input');
+  scrubber.type = 'range';
+  scrubber.id = 'dateScrubber';
+  scrubber.className = 'date-scrubber';
+  scrubber.min = '0';
+  scrubber.max = '0';
+  scrubber.value = '0';
+  scrubber.step = '1';
+  return scrubber;
+}
+
+function ensureDateNavigator() {
+  const datePicker = byId('datePicker');
+  if (!datePicker) return;
+  const dateControl = datePicker.closest('.date-control');
+  if (!dateControl) return;
+
+  let navigator = dateControl.closest('.date-navigator');
+  if (!navigator) {
+    navigator = document.createElement('div');
+    navigator.className = 'date-navigator';
+    navigator.setAttribute('role', 'group');
+    navigator.setAttribute('aria-labelledby', 'dateLabel');
+    dateControl.parentNode.insertBefore(navigator, dateControl);
+    navigator.appendChild(buildDateStepButton('prevDateButton', '&larr;'));
+    navigator.appendChild(dateControl);
+    navigator.appendChild(buildDateStepButton('nextDateButton', '&rarr;'));
+    return;
+  }
+
+  if (!byId('prevDateButton')) {
+    navigator.insertBefore(buildDateStepButton('prevDateButton', '&larr;'), navigator.firstChild);
+  }
+  if (!byId('nextDateButton')) {
+    navigator.appendChild(buildDateStepButton('nextDateButton', '&rarr;'));
+  }
+  if (!byId('dateScrubber')) {
+    dateControl.appendChild(buildDateScrubber());
+  }
+}
+
 function basisOptionValues() {
   return ['all', 'hydraulic', 'q2_fallback', 'tr_alert_severe'];
+}
+
+function hydraulicAvailabilityValues() {
+  return ['all', 'yes', 'no'];
 }
 
 function populateFilters() {
   const statusFilter = byId('statusFilter');
   const basisFilter = byId('basisFilter');
   const qaFilter = byId('qaFilter');
+  const crossSectionFilter = byId('crossSectionFilter');
+  const ratingCurveFilter = byId('ratingCurveFilter');
   const ufFilter = byId('ufFilter');
   const basinFilter = byId('basinFilter');
   const biomeFilter = byId('biomeFilter');
@@ -1270,6 +1672,8 @@ function populateFilters() {
 
   fillSelect(statusFilter, statusOptionValues(), (value) => value === 'all' ? text('status').all : statusLabel(value));
   fillSelect(basisFilter, basisOptionValues(), (value) => value === 'all' ? text('basis').all : basisLabel(value));
+  fillSelect(crossSectionFilter, hydraulicAvailabilityValues(), (value) => nestedText('hydraulicAvailability', value));
+  fillSelect(ratingCurveFilter, hydraulicAvailabilityValues(), (value) => nestedText('hydraulicAvailability', value));
 
   const qaValues = ['all', ...Array.from(new Set(state.stations.map((station) => station.qa_review_class).filter(Boolean))).sort()];
   fillSelect(qaFilter, qaValues, (value) => value === 'all' ? text('qa').all : qaLabel(value));
@@ -1320,6 +1724,8 @@ function currentFilters() {
     status: byId('statusFilter').value,
     basis: byId('basisFilter').value,
     qa: byId('qaFilter').value,
+    crossSection: byId('crossSectionFilter').value,
+    ratingCurve: byId('ratingCurveFilter').value,
     uf: byId('ufFilter').value,
     basin: byId('basinFilter').value,
     biome: byId('biomeFilter').value,
@@ -1335,6 +1741,10 @@ function applyFilters() {
     if (filters.status !== 'all' && info.status !== filters.status) return false;
     if (filters.basis !== 'all' && basisKey !== filters.basis) return false;
     if (filters.qa !== 'all' && station.qa_review_class !== filters.qa) return false;
+    if (filters.crossSection === 'yes' && !station.has_cross_sections) return false;
+    if (filters.crossSection === 'no' && station.has_cross_sections) return false;
+    if (filters.ratingCurve === 'yes' && !station.has_rating_curves) return false;
+    if (filters.ratingCurve === 'no' && station.has_rating_curves) return false;
     if (filters.uf !== 'all' && station.uf !== filters.uf) return false;
     if (filters.basin !== 'all' && station.basin_name !== filters.basin) return false;
     if (filters.biome !== 'all' && station.biome !== filters.biome) return false;
@@ -1373,8 +1783,12 @@ function renderStationList() {
 
 function renderMap() {
   if (state.markersLayer) state.markersLayer.remove();
-  const markers = [];
   state.markersLayer = L.layerGroup();
+  if (!state.mapVisibility.stations) {
+    state.markerBounds = null;
+    return;
+  }
+  const markers = [];
   state.filteredStations.forEach((station) => {
     if (station.lat === null || station.lon === null || station.lat === undefined || station.lon === undefined) return;
     const info = getStatusInfo(station.station_code, state.selectedDate);
@@ -1453,10 +1867,83 @@ function addDays(dateString, offset) {
   return date.toISOString().slice(0, 10);
 }
 
+function utcDayNumber(dateString) {
+  return Math.round(Date.parse(`${dateString}T00:00:00Z`) / 86400000);
+}
+
+function clampDateToSupportedRange(dateString) {
+  if (!state.manifest || !dateString) return dateString;
+  if (dateString < state.manifest.supported_date_min) return state.manifest.supported_date_min;
+  if (dateString > state.manifest.supported_date_max) return state.manifest.supported_date_max;
+  return dateString;
+}
+
+function scrubberOffsetForDate(dateString) {
+  if (!state.manifest || !dateString) return 0;
+  return Math.max(0, utcDayNumber(clampDateToSupportedRange(dateString)) - utcDayNumber(state.manifest.supported_date_min));
+}
+
+function dateForScrubberOffset(offset) {
+  if (!state.manifest) return state.selectedDate;
+  const dayNumber = utcDayNumber(state.manifest.supported_date_min) + Number(offset || 0);
+  return new Date(dayNumber * 86400000).toISOString().slice(0, 10);
+}
+
+function updateDateNavigation() {
+  const datePicker = byId('datePicker');
+  if (!datePicker) return;
+  const minDate = state.manifest?.supported_date_min || '';
+  const maxDate = state.manifest?.supported_date_max || '';
+  datePicker.min = minDate;
+  datePicker.max = maxDate;
+
+  const dateScrubber = byId('dateScrubber');
+  if (dateScrubber) {
+    if (minDate && maxDate) {
+      dateScrubber.min = '0';
+      dateScrubber.max = String(Math.max(0, utcDayNumber(maxDate) - utcDayNumber(minDate)));
+      dateScrubber.value = String(scrubberOffsetForDate(state.selectedDate || minDate));
+      dateScrubber.disabled = false;
+    } else {
+      dateScrubber.min = '0';
+      dateScrubber.max = '0';
+      dateScrubber.value = '0';
+      dateScrubber.disabled = true;
+    }
+  }
+
+  const prevButton = byId('prevDateButton');
+  const nextButton = byId('nextDateButton');
+  if (!prevButton || !nextButton || !state.selectedDate) return;
+
+  prevButton.disabled = Boolean(minDate) && state.selectedDate <= minDate;
+  nextButton.disabled = Boolean(maxDate) && state.selectedDate >= maxDate;
+}
+
 function hydrateStationData(raw) {
   if (state.stationCache.has(raw.metadata.station_code)) return state.stationCache.get(raw.metadata.station_code);
   const hydrated = structuredClone(raw);
   const startDate = raw.daily.start_date;
+  hydrated.hydraulic = {
+    crossSections: (raw.hydraulic?.cross_sections || []).map(([date, id, points]) => ({
+      date,
+      id,
+      points: (points || []).map(([x, y]) => ({ x: Number(x), y: Number(y) })),
+    })),
+    ratingCurves: (raw.hydraulic?.rating_curves || []).map(([validFrom, validTo, year, curveId, segmentId, stageMin, stageMax, coefficientA, coefficientH0, coefficientN]) => ({
+      validFrom,
+      validTo,
+      year: year == null ? null : Number(year),
+      curveId,
+      segmentId,
+      stageMin: stageMin == null ? null : Number(stageMin),
+      stageMax: stageMax == null ? null : Number(stageMax),
+      coefficientA: coefficientA == null ? null : Number(coefficientA),
+      coefficientH0: coefficientH0 == null ? null : Number(coefficientH0),
+      coefficientN: coefficientN == null ? null : Number(coefficientN),
+      key: curveKey(curveId, segmentId),
+    })),
+  };
   hydrated.dailyRows = raw.daily.rows.map(([offset, observed, statusChar, basisChar]) => ({
     offset: Number(offset),
     date: addDays(startDate, Number(offset)),
@@ -1465,7 +1952,7 @@ function hydrateStationData(raw) {
     basis: basisKeyFromChar(basisChar),
   }));
   hydrated.dailyMap = new Map(hydrated.dailyRows.map((row) => [row.date, row]));
-  hydrated.intervalsHydrated = raw.intervals.map(([startOffset, endOffset, valueType, alert, flood, severe, thresholdSource, crossSectionDate, crossSectionId, flags]) => {
+  hydrated.intervalsHydrated = raw.intervals.map(([startOffset, endOffset, valueType, alert, flood, severe, thresholdSource, crossSectionDate, crossSectionId, flags, ratingCurveId, ratingCurveSegmentId]) => {
     const normalized = normalizeThresholdTriplet(alert, flood, severe);
     return {
       startOffset: Number(startOffset),
@@ -1480,6 +1967,9 @@ function hydrateStationData(raw) {
       crossSectionDate,
       crossSectionId,
       flags,
+      ratingCurveId,
+      ratingCurveSegmentId,
+      curveKey: curveKey(ratingCurveId, ratingCurveSegmentId),
     };
   });
   state.stationCache.set(raw.metadata.station_code, hydrated);
@@ -1629,8 +2119,23 @@ function renderTimeseriesChart(stationData) {
   canvas.hidden = false;
   emptyNode.hidden = true;
   const valueType = stationData.summary.threshold_value_type;
+  const latestCurve = valueType === 'stage_cm' ? latestRatingCurve(stationData) : null;
   const labels = rows.map((row) => row.date);
   const values = rows.map((row) => row.observed_value);
+  const derivedDischarge = latestCurve
+    ? rows.map((row) => {
+      if (!isFiniteNumber(row.observed_value)) return null;
+      const stage = Number(row.observed_value);
+      const withinCurveBounds = (
+        !isFiniteNumber(latestCurve.stageMin)
+        || !isFiniteNumber(latestCurve.stageMax)
+        || (stage >= Number(latestCurve.stageMin) && stage <= Number(latestCurve.stageMax))
+      );
+      if (!withinCurveBounds) return null;
+      return ratingDischarge(stage, latestCurve.coefficientA, latestCurve.coefficientH0, latestCurve.coefficientN);
+    })
+    : [];
+  const hasDerivedDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
   const normalizedThresholdRows = rows.map((row) => {
     const interval = findIntervalForDate(stationData, row.date);
     return normalizeThresholdTriplet(
@@ -1697,6 +2202,20 @@ function renderTimeseriesChart(stationData) {
           pointBorderColor: '#fff',
           pointBorderWidth: 1.5,
         },
+        ...(latestCurve && hasDerivedDischarge ? [{
+          label: state.lang === 'pt'
+            ? `Vazão estimada pela curva-chave mais recente (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`
+            : `Estimated discharge from the latest rating curve (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`,
+          data: derivedDischarge,
+          yAxisID: 'yDischarge',
+          borderColor: '#2E8B8B',
+          backgroundColor: 'rgba(46, 139, 139, 0.1)',
+          pointRadius: 0,
+          borderWidth: 1.8,
+          borderDash: [8, 4],
+          tension: 0.08,
+          spanGaps: true,
+        }] : []),
       ],
     },
     options: {
@@ -1724,10 +2243,346 @@ function renderTimeseriesChart(stationData) {
             color: '#42545c',
           },
         },
+        ...(latestCurve && hasDerivedDischarge ? {
+          yDischarge: {
+            position: 'right',
+            ticks: { color: '#2E8B8B' },
+            grid: { drawOnChartArea: false },
+            title: {
+              display: true,
+              text: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)',
+              color: '#2E8B8B',
+            },
+          },
+        } : {}),
       },
     },
   });
   byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}`;
+}
+
+function renderCrossSectionChart(stationData) {
+  const emptyNode = byId('crossSectionEmpty');
+  const canvas = byId('crossSectionChart');
+  const sections = (stationData.hydraulic?.crossSections || []).slice().sort((left, right) => {
+    const leftKey = left.date || '';
+    const rightKey = right.date || '';
+    return leftKey.localeCompare(rightKey);
+  });
+  if (!sections.length) {
+    destroyChart('crossSectionChart');
+    canvas.hidden = true;
+    emptyNode.hidden = false;
+    return;
+  }
+
+  const band = crossSectionBand(stationData);
+  const latestSection = sections[sections.length - 1];
+  const subtitle = byId('crossSectionSubtitle');
+  if (subtitle) {
+    subtitle.textContent = state.lang === 'pt'
+      ? `${sections.length} seções observadas e faixa de incerteza do limiar hidráulico. Última seção: ${formatShortDate(latestSection?.date)}`
+      : `${sections.length} observed cross sections and the hydraulic-threshold uncertainty band. Latest section: ${formatShortDate(latestSection?.date)}`;
+  }
+  canvas.hidden = false;
+  emptyNode.hidden = true;
+  destroyChart('crossSectionChart');
+  state.charts.crossSectionChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: sections.map((section, index) => {
+        const isLatest = index === sections.length - 1;
+        const grayValue = Math.round(190 - (index / Math.max(sections.length - 1, 1)) * 95);
+        return {
+          label: isLatest
+            ? (state.lang === 'pt' ? `Última seção · ${formatShortDate(section.date)}` : `Latest section · ${formatShortDate(section.date)}`)
+            : (section.date ? section.date.slice(0, 4) : `S${index + 1}`),
+          data: section.points,
+          parsing: false,
+          showLine: true,
+          pointRadius: 0,
+          tension: 0,
+          borderColor: isLatest ? '#D04B45' : `rgb(${grayValue}, ${grayValue}, ${grayValue})`,
+          borderWidth: isLatest ? 3 : 1.5,
+          borderCapStyle: 'round',
+          order: isLatest ? 99 : index,
+        };
+      }),
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'nearest' },
+      plugins: {
+        thresholdBand: {
+          enabled: !!band,
+          low: band?.low,
+          median: band?.median,
+          high: band?.high,
+        },
+        legend: {
+          display: sections.length <= 14,
+          position: 'bottom',
+          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: { color: '#5b6a71' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          title: {
+            display: true,
+            text: state.lang === 'pt' ? 'Distância da seção (m)' : 'Cross-section distance (m)',
+            color: '#42545c',
+          },
+        },
+        y: {
+          ticks: { color: '#5b6a71' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          title: {
+            display: true,
+            text: state.lang === 'pt' ? 'Cota/elevação (cm)' : 'Stage/elevation (cm)',
+            color: '#42545c',
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderDynamicDailyChart(stationData) {
+  const emptyNode = byId('dynamicDailyEmpty');
+  const canvas = byId('dynamicDailyChart');
+  const rows = stationData.dailyRows || [];
+  if (!rows.length) {
+    destroyChart('dynamicDailyChart');
+    canvas.hidden = true;
+    emptyNode.hidden = false;
+    return;
+  }
+
+  const valueType = stationData.summary.threshold_value_type;
+  const labels = rows.map((row) => row.date);
+  const values = rows.map((row) => row.observed_value);
+  const flood = rows.map((row) => {
+    const interval = findIntervalForDate(stationData, row.date);
+    const normalized = normalizeThresholdTriplet(
+      interval ? interval.alert : null,
+      interval ? interval.flood : stationData.summary.threshold_value,
+      interval ? interval.severe : null,
+    );
+    return normalized.flood;
+  });
+  const peaks = normalizedEventRows(stationData)
+    .map((event) => ({
+      x: event.peak_date,
+      y: valueType === 'stage_cm' ? event.peak_stage_cm : event.peak_discharge_m3s,
+    }))
+    .filter((event) => event.x && isFiniteNumber(event.y));
+
+  canvas.hidden = false;
+  emptyNode.hidden = true;
+  destroyChart('dynamicDailyChart');
+  state.charts.dynamicDailyChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: thresholdTypeLabel(valueType),
+          data: values,
+          borderColor: '#5c5c5c',
+          pointRadius: 0,
+          borderWidth: 1,
+          tension: 0,
+        },
+        {
+          label: text('fields').flood,
+          data: flood,
+          borderColor: '#111111',
+          borderWidth: 1.6,
+          stepped: true,
+          pointRadius: 0,
+          spanGaps: true,
+        },
+        {
+          label: state.lang === 'pt' ? 'Picos reconstruídos' : 'Reconstructed peaks',
+          type: 'scatter',
+          data: peaks,
+          pointRadius: 2.2,
+          pointHoverRadius: 3.2,
+          pointBackgroundColor: '#9b1d20',
+          pointBorderWidth: 0,
+        },
+      ],
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#5b6a71', maxTicksLimit: 7 },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+        y: {
+          ticks: { color: '#5b6a71' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          title: {
+            display: true,
+            text: TEXT[state.lang].units[valueType],
+            color: '#42545c',
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderRatingCurveChart(stationData) {
+  const emptyNode = byId('ratingCurveEmpty');
+  const canvas = byId('ratingCurveChart');
+  const curves = stationData.hydraulic?.ratingCurves || [];
+  if (!curves.length) {
+    destroyChart('ratingCurveChart');
+    canvas.hidden = true;
+    emptyNode.hidden = false;
+    return;
+  }
+
+  const years = [...new Set(curves.map((curve) => curve.year).filter((year) => year != null))].sort((a, b) => a - b);
+  const colorByYear = new Map(years.map((year, index) => [year, CURVE_COLORS[index % CURVE_COLORS.length]]));
+  const curveByKey = new Map(curves.map((curve) => [curve.key, curve]));
+  const datasets = curves.map((curve) => {
+    const span = Number(curve.stageMax) - Number(curve.stageMin);
+    const step = span > 0 ? span / 120 : 1;
+    const points = [];
+    for (let stage = Number(curve.stageMin); stage <= Number(curve.stageMax); stage += step) {
+      const discharge = ratingDischarge(stage, curve.coefficientA, curve.coefficientH0, curve.coefficientN);
+      if (isFiniteNumber(discharge) && Number(discharge) > 0) {
+        points.push({ x: Number(discharge), y: Number(stage) });
+      }
+    }
+    if (!points.length) return null;
+    return {
+      label: curve.validFrom ? curve.validFrom.slice(0, 4) : String(curve.year || ''),
+      data: points,
+      parsing: false,
+      showLine: true,
+      pointRadius: 0,
+      tension: 0,
+      borderWidth: 1.4,
+      borderColor: colorByYear.get(curve.year) || '#5e2b83',
+    };
+  }).filter(Boolean);
+
+  const thresholdPoints = stationData.intervalsHydrated
+    .map((interval) => {
+      const curve = curveByKey.get(interval.curveKey);
+      if (!curve) return null;
+      let discharge = null;
+      let stage = null;
+      if (interval.valueType === 'stage_cm' && isFiniteNumber(interval.flood)) {
+        stage = Number(interval.flood);
+        discharge = ratingDischarge(stage, curve.coefficientA, curve.coefficientH0, curve.coefficientN);
+      } else if (interval.valueType === 'discharge_m3s' && isFiniteNumber(interval.flood)) {
+        discharge = Number(interval.flood);
+        stage = ratingStageFromDischarge(discharge, curve.coefficientA, curve.coefficientH0, curve.coefficientN);
+      }
+      if (!isFiniteNumber(discharge) || !isFiniteNumber(stage) || Number(discharge) <= 0) return null;
+      return {
+        x: Number(discharge),
+        y: Number(stage),
+        color: colorByYear.get(curve.year) || '#5e2b83',
+      };
+    })
+    .filter(Boolean);
+
+  const stageValues = datasets.flatMap((dataset) => dataset.data.map((point) => point.y));
+  const q2 = isFiniteNumber(stationData.summary.q2_m3s) ? Number(stationData.summary.q2_m3s) : null;
+  if (q2 && stageValues.length) {
+    datasets.push({
+      label: 'Q2',
+      data: [
+        { x: q2, y: Math.min(...stageValues) },
+        { x: q2, y: Math.max(...stageValues) },
+      ],
+      parsing: false,
+      showLine: true,
+      pointRadius: 0,
+      borderWidth: 1.3,
+      borderDash: [7, 4],
+      borderColor: '#202020',
+    });
+  }
+  if (thresholdPoints.length) {
+    datasets.push({
+      label: state.lang === 'pt' ? 'Pontos de limiar dinâmico' : 'Dynamic threshold points',
+      type: 'scatter',
+      data: thresholdPoints.map((point) => ({ x: point.x, y: point.y })),
+      pointRadius: 3.1,
+      pointHoverRadius: 4.1,
+      pointBackgroundColor: thresholdPoints.map((point) => point.color),
+      pointBorderColor: '#ffffff',
+      pointBorderWidth: 0.8,
+    });
+  }
+  if (!datasets.length) {
+    destroyChart('ratingCurveChart');
+    canvas.hidden = true;
+    emptyNode.hidden = false;
+    return;
+  }
+
+  canvas.hidden = false;
+  emptyNode.hidden = true;
+  destroyChart('ratingCurveChart');
+  state.charts.ratingCurveChart = new Chart(canvas, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'nearest' },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
+        },
+      },
+      scales: {
+        x: {
+          type: 'logarithmic',
+          ticks: { color: '#5b6a71' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          title: {
+            display: true,
+            text: state.lang === 'pt' ? 'Vazão (m³/s)' : 'Discharge (m³/s)',
+            color: '#42545c',
+          },
+        },
+        y: {
+          ticks: { color: '#5b6a71' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          title: {
+            display: true,
+            text: state.lang === 'pt' ? 'Cota (cm)' : 'Stage (cm)',
+            color: '#42545c',
+          },
+        },
+      },
+    },
+  });
 }
 
 function renderEvidenceChart(stationData) {
@@ -1925,7 +2780,14 @@ function renderSeasonality(stationData) {
 function renderEventsTable(stationData) {
   const body = byId('eventTableBody');
   body.innerHTML = '';
-  normalizedEventRows(stationData).slice(0, 12).forEach((event) => {
+  const events = normalizedEventRows(stationData);
+  if (!events.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="5">-</td>';
+    body.appendChild(tr);
+    return;
+  }
+  events.forEach((event) => {
     const tr = document.createElement('tr');
     const classText = event.display_class;
     const peakValue = event.peak_stage_cm != null
@@ -1974,14 +2836,28 @@ function renderQaSection(stationData) {
   const openButton = byId('openQaImageButton');
   const subpanelsNode = byId('qaSubpanels');
   const subpanelList = byId('qaSubpanelList');
+  const setQaFallback = () => {
+    img.hidden = true;
+    caption.hidden = true;
+    if (openButton) openButton.hidden = true;
+    fallback.textContent = text('noQaPanel');
+    fallback.hidden = false;
+    byId('imageOverlayImg').removeAttribute('src');
+    byId('imageOverlayCaption').textContent = text('noQaPanel');
+    subpanelList.innerHTML = '';
+    subpanelsNode.hidden = true;
+  };
   if (stationData.qa.panel_png) {
+    img.onerror = () => setQaFallback();
+    img.onload = () => {
+      img.hidden = false;
+      caption.hidden = false;
+      if (openButton) openButton.hidden = false;
+      fallback.hidden = true;
+    };
     img.src = stationData.qa.panel_png;
-    img.hidden = false;
     caption.textContent = text('qaFigureCaption');
-    caption.hidden = false;
-    if (openButton) openButton.hidden = false;
     fallback.textContent = '';
-    fallback.hidden = true;
     byId('imageOverlayImg').src = stationData.qa.panel_png;
     byId('imageOverlayCaption').textContent = text('qaFigureCaption');
     subpanelList.innerHTML = QA_PANEL_PARTS.map((panel) => `
@@ -1994,15 +2870,7 @@ function renderQaSection(stationData) {
     `).join('');
     subpanelsNode.hidden = false;
   } else {
-    img.hidden = true;
-    caption.hidden = true;
-    if (openButton) openButton.hidden = true;
-    fallback.textContent = text('noQaPanel');
-    fallback.hidden = false;
-    byId('imageOverlayImg').removeAttribute('src');
-    byId('imageOverlayCaption').textContent = text('noQaPanel');
-    subpanelList.innerHTML = '';
-    subpanelsNode.hidden = true;
+    setQaFallback();
   }
 }
 
@@ -2018,6 +2886,15 @@ function renderEmptySelection() {
   byId('qaFlags').innerHTML = '';
   byId('eventMetrics').innerHTML = '';
   byId('eventTableBody').innerHTML = '';
+  byId('crossSectionChart').hidden = true;
+  byId('crossSectionEmpty').hidden = true;
+  destroyChart('crossSectionChart');
+  byId('dynamicDailyChart').hidden = true;
+  byId('dynamicDailyEmpty').hidden = true;
+  destroyChart('dynamicDailyChart');
+  byId('ratingCurveChart').hidden = true;
+  byId('ratingCurveEmpty').hidden = true;
+  destroyChart('ratingCurveChart');
   byId('evidenceSummary').textContent = '-';
   byId('evidenceChart').hidden = true;
   byId('evidenceEmpty').hidden = true;
@@ -2046,6 +2923,9 @@ async function selectStation(stationCode) {
   renderStatusCard(data);
   renderMetadata(data);
   renderTimeseriesChart(data);
+  renderCrossSectionChart(data);
+  renderDynamicDailyChart(data);
+  renderRatingCurveChart(data);
   renderEvidenceChart(data);
   renderEventSummary(data);
   renderSeasonality(data);
@@ -2077,9 +2957,15 @@ function parseUrlState() {
 }
 
 async function setSelectedDate(dateString, preserveSelection = true) {
-  state.selectedDate = dateString;
+  if (state.dateScrubberTimer) {
+    window.clearTimeout(state.dateScrubberTimer);
+    state.dateScrubberTimer = null;
+  }
+  state.selectedDate = clampDateToSupportedRange(dateString);
   byId('datePicker').value = dateString;
-  await loadMonth(dateString);
+  updateDateNavigation();
+  byId('datePicker').value = state.selectedDate;
+  await loadMonth(state.selectedDate);
   applyFilters();
   if (preserveSelection && state.selectedCode) {
     if (state.selectedData) {
@@ -2167,6 +3053,65 @@ async function buildQaPanelPartImages(src) {
   })));
 }
 
+const REPORT_THEME = {
+  accent: '1F5E7A',
+  text: '24323A',
+  muted: '5B6A71',
+  soft: 'F3EFE6',
+  softAccent: 'E7F0F3',
+  border: 'D2C4AF',
+};
+
+function reportRun(text, options = {}) {
+  const docx = window.docx;
+  return new docx.TextRun({
+    text: text == null ? '' : String(text),
+    bold: Boolean(options.bold),
+    italics: Boolean(options.italics),
+    color: options.color || REPORT_THEME.text,
+    size: options.size || 24,
+    font: options.font || 'Aptos',
+  });
+}
+
+function reportParagraph(text, options = {}) {
+  const docx = window.docx;
+  return new docx.Paragraph({
+    alignment: options.alignment,
+    pageBreakBefore: options.pageBreakBefore,
+    spacing: {
+      before: options.before || 0,
+      after: options.after ?? 140,
+      line: options.line || 320,
+    },
+    children: Array.isArray(options.children) && options.children.length
+      ? options.children
+      : [reportRun(text, options)],
+  });
+}
+
+function reportCell(text, options = {}) {
+  const docx = window.docx;
+  return new docx.TableCell({
+    shading: options.fill ? { fill: options.fill } : undefined,
+    margins: {
+      top: 90,
+      bottom: 90,
+      left: 110,
+      right: 110,
+    },
+    children: [
+      reportParagraph(text, {
+        size: options.size || 24,
+        bold: options.bold,
+        color: options.color || REPORT_THEME.text,
+        after: 0,
+        line: 280,
+      }),
+    ],
+  });
+}
+
 async function exportStationReport() {
   if (!state.selectedData || !window.docx) return;
   const previousRange = state.currentRange;
@@ -2179,13 +3124,22 @@ async function exportStationReport() {
       document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node.dataset.range === 'full'));
       renderTimeseriesChart(state.selectedData);
     }
+    renderCrossSectionChart(state.selectedData);
+    renderDynamicDailyChart(state.selectedData);
+    renderRatingCurveChart(state.selectedData);
     renderEvidenceChart(state.selectedData);
-    const chartBytes = await chartToBytes('timeseriesChart', 1800, 900);
-    const evidenceBytes = await chartToBytes('evidenceChart', 1700, 860);
+    renderSeasonality(state.selectedData);
+    const chartBytes = await chartToBytes('timeseriesChart', 2600, 1400);
+    const crossSectionBytes = await chartToBytes('crossSectionChart', 2400, 1400);
+    const dynamicDailyBytes = await chartToBytes('dynamicDailyChart', 2600, 1400);
+    const ratingCurveBytes = await chartToBytes('ratingCurveChart', 2400, 1400);
+    const evidenceBytes = await chartToBytes('evidenceChart', 2500, 1350);
+    const seasonalityBytes = await chartToBytes('seasonalityChart', 2400, 1200);
     const qaPanelParts = state.selectedData.qa.panel_png ? await buildQaPanelPartImages(state.selectedData.qa.panel_png) : [];
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
-    const docEvents = normalizedEventRows(state.selectedData).slice(0, 8);
+    const latestCurve = latestRatingCurve(state.selectedData);
+    const docEvents = normalizedEventRows(state.selectedData);
     const qaFlagsText = (state.selectedData.qa.flags || []).length ? state.selectedData.qa.flags.map(flagLabel).join('; ') : text('noQaFlags');
     const summaryPairs = [
       [text('fields').selectedDate, formatDate(state.selectedDate)],
@@ -2197,141 +3151,228 @@ async function exportStationReport() {
       [text('fields').alert, formatValue(details.alert, details.valueType)],
       [text('fields').flood, formatValue(details.flood, details.valueType)],
       [text('fields').severe, formatValue(details.severe, details.valueType)],
+      [text('fields').percentile, formatPercent(state.selectedData.summary.threshold_empirical_percentile, 2)],
+      [text('fields').exceedance, formatPercent(state.selectedData.summary.threshold_exceedance_fraction, 2)],
       [text('fields').eventCount, formatNumber(state.selectedData.summary.n_events, 0)],
       [text('fields').eventFrequency, formatNumber(state.selectedData.summary.event_frequency_per_year, 2)],
       [text('fields').maxDuration, formatDuration(state.selectedData.summary.max_event_duration_days)],
     ];
 
-    const summaryTable = new docx.Table({
-      rows: summaryPairs.map(([label, value]) => new docx.TableRow({
+    const summaryRows = [];
+    for (let index = 0; index < summaryPairs.length; index += 2) {
+      const left = summaryPairs[index];
+      const right = summaryPairs[index + 1];
+      summaryRows.push(new docx.TableRow({
         children: [
-          new docx.TableCell({
-            children: [new docx.Paragraph({ text: label })],
-          }),
-          new docx.TableCell({
-            children: [new docx.Paragraph({ text: value })],
-          }),
+          reportCell(left?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
+          reportCell(left?.[1] || ''),
+          reportCell(right?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
+          reportCell(right?.[1] || ''),
         ],
-      })),
-    });
+      }));
+    }
+    const summaryTable = new docx.Table({ rows: summaryRows });
 
     const eventsTableRows = [
       new docx.TableRow({
-        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell) => new docx.TableCell({
-          children: [new docx.Paragraph(cell)],
+        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell) => reportCell(cell, {
+          fill: REPORT_THEME.softAccent,
+          bold: true,
+          color: REPORT_THEME.accent,
         })),
       }),
       ...(docEvents.length
         ? docEvents.map((event) => new docx.TableRow({
           children: [
-            new docx.TableCell({ children: [new docx.Paragraph(formatShortDate(event.event_start))] }),
-            new docx.TableCell({ children: [new docx.Paragraph(formatShortDate(event.peak_date))] }),
-            new docx.TableCell({ children: [new docx.Paragraph(formatDuration(event.duration_days))] }),
-            new docx.TableCell({
-              children: [
-                new docx.Paragraph(
-                  event.peak_stage_cm != null
-                    ? formatValue(event.peak_stage_cm, 'stage_cm')
-                    : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
-                ),
-              ],
-            }),
-            new docx.TableCell({ children: [new docx.Paragraph(event.display_class)] }),
+            reportCell(formatShortDate(event.event_start)),
+            reportCell(formatShortDate(event.peak_date)),
+            reportCell(formatDuration(event.duration_days)),
+            reportCell(
+              event.peak_stage_cm != null
+                ? formatValue(event.peak_stage_cm, 'stage_cm')
+                : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
+            ),
+            reportCell(event.display_class),
           ],
         }))
         : [new docx.TableRow({
-          children: Array.from({ length: 5 }, (_, index) => new docx.TableCell({
-            children: [new docx.Paragraph(index === 0 ? '-' : '')],
-          })),
+          children: Array.from({ length: 5 }, (_, index) => reportCell(index === 0 ? '-' : '')),
         })]),
     ];
+
+    const figureParagraph = (bytes, width, height) => new docx.Paragraph({
+      alignment: docx.AlignmentType.CENTER,
+      spacing: { after: 120 },
+      children: [
+        new docx.ImageRun({
+          data: bytes,
+          transformation: { width, height },
+        }),
+      ],
+    });
+
+    const figureCaption = (captionText) => reportParagraph(captionText, {
+      size: 24,
+      italics: true,
+      color: REPORT_THEME.muted,
+      after: 220,
+    });
+
+    const timeseriesCaption = latestCurve && state.selectedData.summary.threshold_value_type === 'stage_cm'
+      ? `${TEXT[state.lang].report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
+      : TEXT[state.lang].report.chartCaption;
 
     const doc = new docx.Document({
       sections: [
         {
-          properties: {},
+          properties: {
+            page: {
+              margin: { top: 720, right: 720, bottom: 720, left: 720 },
+            },
+          },
           children: [
-            new docx.Paragraph({
-              text: TEXT[state.lang].report.title,
-              heading: docx.HeadingLevel.TITLE,
+            reportParagraph(TEXT[state.lang].report.title, {
+              size: 40,
+              bold: true,
+              color: REPORT_THEME.accent,
+              after: 80,
             }),
-            new docx.Paragraph({
-              text: `${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`,
+            reportParagraph(`${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`, {
+              size: 30,
+              bold: true,
+              after: 50,
             }),
-            new docx.Paragraph({
-              text: `${TEXT[state.lang].report.summarySection}`,
-              heading: docx.HeadingLevel.HEADING_1,
+            reportParagraph(`${formatDate(state.selectedDate)} · ${statusLabel(details.status)} · ${basisLabel(basisKey)}`, {
+              size: 24,
+              color: REPORT_THEME.muted,
+              after: 220,
+            }),
+            reportParagraph(TEXT[state.lang].report.summarySection, {
+              size: 30,
+              bold: true,
+              color: REPORT_THEME.accent,
+              after: 100,
             }),
             summaryTable,
-            new docx.Paragraph({
-              text: TEXT[state.lang].report.methodSection,
-              heading: docx.HeadingLevel.HEADING_1,
+            reportParagraph(TEXT[state.lang].report.methodSection, {
+              size: 30,
+              bold: true,
+              color: REPORT_THEME.accent,
+              before: 180,
+              after: 80,
             }),
-            new docx.Paragraph(TEXT[state.lang].report.methodText),
-            new docx.Paragraph({
-              text: TEXT[state.lang].report.chartSection,
-              heading: docx.HeadingLevel.HEADING_1,
-              pageBreakBefore: true,
-            }),
-            ...(chartBytes ? [
-              new docx.Paragraph({
-                alignment: docx.AlignmentType.CENTER,
-                children: [
-                  new docx.ImageRun({
-                    data: chartBytes,
-                    transformation: { width: 640, height: 320 },
-                  }),
-                ],
-              }),
-              new docx.Paragraph(TEXT[state.lang].report.chartCaption),
-            ] : []),
-            ...(evidenceBytes ? [
-              new docx.Paragraph({
-                text: TEXT[state.lang].report.evidenceSection,
-                heading: docx.HeadingLevel.HEADING_1,
-              }),
-              new docx.Paragraph({
-                alignment: docx.AlignmentType.CENTER,
-                children: [
-                  new docx.ImageRun({
-                    data: evidenceBytes,
-                    transformation: { width: 640, height: 320 },
-                  }),
-                ],
-              }),
-              new docx.Paragraph(TEXT[state.lang].report.evidenceCaption),
-            ] : []),
-            new docx.Paragraph({
-              text: TEXT[state.lang].report.qaSection,
-              heading: docx.HeadingLevel.HEADING_1,
-              pageBreakBefore: true,
-            }),
-            new docx.Paragraph(qaFlagsText),
-            ...(qaPanelParts.length ? [
-              new docx.Paragraph(TEXT[state.lang].report.qaCaption),
-              new docx.Paragraph({
-                text: TEXT[state.lang].report.qaSubpanelsSection,
-                heading: docx.HeadingLevel.HEADING_2,
-              }),
-              ...qaPanelParts.flatMap((panel) => [
-                new docx.Paragraph({
-                  text: panel.title,
-                  heading: docx.HeadingLevel.HEADING_3,
-                }),
-                new docx.Paragraph({
-                  alignment: docx.AlignmentType.CENTER,
+            new docx.Table({
+              rows: [
+                new docx.TableRow({
                   children: [
-                    new docx.ImageRun({
-                      data: panel.bytes,
-                      transformation: { width: 620, height: 410 },
+                    reportCell(TEXT[state.lang].report.methodText, {
+                      fill: REPORT_THEME.soft,
+                      size: 24,
                     }),
                   ],
                 }),
+              ],
+            }),
+            reportParagraph(TEXT[state.lang].report.chartSection, {
+              size: 30,
+              bold: true,
+              color: REPORT_THEME.accent,
+              pageBreakBefore: true,
+              after: 90,
+            }),
+            ...(chartBytes ? [
+              figureParagraph(chartBytes, 620, 334),
+              figureCaption(timeseriesCaption),
+            ] : []),
+            ...(crossSectionBytes ? [
+              reportParagraph(TEXT[state.lang].report.crossSectionSection, {
+                size: 28,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              figureParagraph(crossSectionBytes, 620, 360),
+              figureCaption(TEXT[state.lang].report.crossSectionCaption),
+            ] : []),
+            ...(dynamicDailyBytes ? [
+              reportParagraph(TEXT[state.lang].report.dynamicDailySection, {
+                size: 28,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              figureParagraph(dynamicDailyBytes, 620, 334),
+              figureCaption(TEXT[state.lang].report.dynamicDailyCaption),
+            ] : []),
+            ...(ratingCurveBytes ? [
+              reportParagraph(TEXT[state.lang].report.ratingCurveSection, {
+                size: 28,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              figureParagraph(ratingCurveBytes, 620, 360),
+              figureCaption(TEXT[state.lang].report.ratingCurveCaption),
+            ] : []),
+            ...(evidenceBytes ? [
+              reportParagraph(TEXT[state.lang].report.evidenceSection, {
+                size: 28,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              figureParagraph(evidenceBytes, 620, 334),
+              figureCaption(TEXT[state.lang].report.evidenceCaption),
+            ] : []),
+            ...(seasonalityBytes ? [
+              reportParagraph(TEXT[state.lang].report.seasonalitySection, {
+                size: 28,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              figureParagraph(seasonalityBytes, 620, 310),
+              figureCaption(TEXT[state.lang].report.seasonalityCaption),
+            ] : []),
+            reportParagraph(TEXT[state.lang].report.qaSection, {
+              size: 30,
+              bold: true,
+              color: REPORT_THEME.accent,
+              pageBreakBefore: true,
+              after: 80,
+            }),
+            reportParagraph(qaFlagsText, {
+              size: 24,
+              color: REPORT_THEME.muted,
+              after: 120,
+            }),
+            ...(qaPanelParts.length ? [
+              figureCaption(TEXT[state.lang].report.qaCaption),
+              reportParagraph(TEXT[state.lang].report.qaSubpanelsSection, {
+                size: 26,
+                bold: true,
+                color: REPORT_THEME.accent,
+                after: 70,
+              }),
+              ...qaPanelParts.flatMap((panel) => [
+                reportParagraph(panel.title, {
+                  size: 24,
+                  bold: true,
+                  color: REPORT_THEME.text,
+                  after: 60,
+                }),
+                figureParagraph(panel.bytes, 600, 396),
               ]),
-            ] : [new docx.Paragraph(TEXT[state.lang].report.fallbackImage)]),
-            new docx.Paragraph({
-              text: TEXT[state.lang].report.eventsSection,
-              heading: docx.HeadingLevel.HEADING_1,
+            ] : [reportParagraph(TEXT[state.lang].report.fallbackImage, {
+              size: 24,
+              color: REPORT_THEME.muted,
+            })]),
+            reportParagraph(TEXT[state.lang].report.eventsSection, {
+              size: 30,
+              bold: true,
+              color: REPORT_THEME.accent,
+              pageBreakBefore: true,
+              after: 80,
             }),
             new docx.Table({
               rows: eventsTableRows,
@@ -2361,14 +3402,54 @@ async function exportStationReport() {
 }
 
 function wireEvents() {
-  ['stationSearch', 'statusFilter', 'basisFilter', 'qaFilter', 'ufFilter', 'basinFilter', 'biomeFilter'].forEach((id) => {
+  ['stationSearch', 'statusFilter', 'basisFilter', 'qaFilter', 'crossSectionFilter', 'ratingCurveFilter', 'ufFilter', 'basinFilter', 'biomeFilter'].forEach((id) => {
     byId(id).addEventListener('input', applyFilters);
     byId(id).addEventListener('change', applyFilters);
   });
   byId('datePicker').addEventListener('change', async (event) => {
     if (event.target.value) await setSelectedDate(event.target.value);
   });
+  const dateScrubber = byId('dateScrubber');
+  if (dateScrubber) {
+    dateScrubber.addEventListener('input', (event) => {
+      const scrubberDate = dateForScrubberOffset(event.target.value);
+      byId('datePicker').value = scrubberDate;
+      if (state.dateScrubberTimer) window.clearTimeout(state.dateScrubberTimer);
+      state.dateScrubberTimer = window.setTimeout(async () => {
+        state.dateScrubberTimer = null;
+        if (scrubberDate !== state.selectedDate) await setSelectedDate(scrubberDate);
+      }, 140);
+    });
+    dateScrubber.addEventListener('change', async (event) => {
+      const scrubberDate = dateForScrubberOffset(event.target.value);
+      if (state.dateScrubberTimer) {
+        window.clearTimeout(state.dateScrubberTimer);
+        state.dateScrubberTimer = null;
+      }
+      if (scrubberDate !== state.selectedDate) await setSelectedDate(scrubberDate);
+    });
+  }
+  const prevDateButton = byId('prevDateButton');
+  const nextDateButton = byId('nextDateButton');
+  if (prevDateButton) {
+    prevDateButton.addEventListener('click', async () => {
+      if (!state.selectedDate) return;
+      const nextDate = clampDateToSupportedRange(addDays(state.selectedDate, -1));
+      if (nextDate !== state.selectedDate) await setSelectedDate(nextDate);
+    });
+  }
+  if (nextDateButton) {
+    nextDateButton.addEventListener('click', async () => {
+      if (!state.selectedDate) return;
+      const nextDate = clampDateToSupportedRange(addDays(state.selectedDate, 1));
+      if (nextDate !== state.selectedDate) await setSelectedDate(nextDate);
+    });
+  }
   byId('theoryButton').addEventListener('click', () => openOverlay('theoryOverlay'));
+  byId('layersButton').addEventListener('click', () => {
+    renderLayersModal();
+    openOverlay('layersOverlay');
+  });
   byId('fitMapButton').addEventListener('click', fitMapToFiltered);
   byId('exportCsvButton').addEventListener('click', exportFilteredCsv);
   byId('shareButton').addEventListener('click', async () => {
@@ -2380,6 +3461,7 @@ function wireEvents() {
     if (!byId('qaImage').hidden) openOverlay('imageOverlay');
   });
   byId('closeTheoryButton').addEventListener('click', () => closeOverlay('theoryOverlay'));
+  byId('closeLayersButton').addEventListener('click', () => closeOverlay('layersOverlay'));
   byId('closeImageButton').addEventListener('click', () => closeOverlay('imageOverlay'));
   document.querySelectorAll('[data-overlay-close]').forEach((button) => {
     button.addEventListener('click', () => closeOverlay(button.dataset.overlayClose));
@@ -2387,6 +3469,7 @@ function wireEvents() {
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     closeOverlay('theoryOverlay');
+    closeOverlay('layersOverlay');
     closeOverlay('imageOverlay');
   });
   document.querySelectorAll('.lang-button').forEach((button) => {
@@ -2402,6 +3485,9 @@ function wireEvents() {
         renderStatusCard(state.selectedData);
         renderMetadata(state.selectedData);
         renderTimeseriesChart(state.selectedData);
+        renderCrossSectionChart(state.selectedData);
+        renderDynamicDailyChart(state.selectedData);
+        renderRatingCurveChart(state.selectedData);
         renderEvidenceChart(state.selectedData);
         renderEventSummary(state.selectedData);
         renderSeasonality(state.selectedData);
@@ -2429,9 +3515,11 @@ function wireEvents() {
 }
 
 async function boot() {
+  ensureDateNavigator();
   applyStaticTranslations();
   updateLanguageButtons();
   renderLegend();
+  applyMapVisibility();
   renderEmptySelection();
   wireEvents();
   hideFatalState();
@@ -2446,6 +3534,7 @@ async function boot() {
   state.manifest = await loadJson('data/manifest.json');
   state.stations = await loadJson('data/stations.json');
   state.stationByCode = new Map(state.stations.map((station) => [station.station_code, station]));
+  updateDateNavigation();
   renderGlobalStats();
 
   const urlState = parseUrlState();
@@ -2457,10 +3546,20 @@ async function boot() {
   populateFilters();
   byId('qaFilter').value = 'screening_ok';
 
-  const firstDate = urlState.date || state.manifest.latest_status_date || state.manifest.supported_date_max;
+  const preferredDefaultDate = '2020-01-01';
+  const defaultDate = (
+    state.manifest.supported_date_min <= preferredDefaultDate
+    && preferredDefaultDate <= state.manifest.supported_date_max
+  )
+    ? preferredDefaultDate
+    : (state.manifest.latest_status_date || state.manifest.supported_date_max);
+  const firstDate = urlState.date || defaultDate;
   await setSelectedDate(firstDate, false);
 
-  const initialStation = urlState.station || state.filteredStations[0]?.station_code || state.stations[0]?.station_code;
+  const defaultStation = state.stationByCode.has(DEFAULT_STATION_CODE)
+    ? DEFAULT_STATION_CODE
+    : (state.filteredStations[0]?.station_code || state.stations[0]?.station_code);
+  const initialStation = urlState.station || defaultStation;
   if (initialStation) {
     await selectStation(initialStation);
   } else {

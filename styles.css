@@ -125,6 +125,12 @@ a {
   gap: 10px;
 }
 
+.date-navigator {
+  display: inline-flex;
+  align-items: end;
+  gap: 8px;
+}
+
 .date-control {
   display: grid;
   gap: 4px;
@@ -138,11 +144,12 @@ a {
   letter-spacing: 0.04em;
 }
 
-.date-control input,
+.date-control input[type="date"],
 .search-input,
 select,
 .toolbar-button,
 .download-button,
+.date-step-button,
 .lang-button,
 .range-button {
   min-height: 42px;
@@ -152,7 +159,7 @@ select,
   color: var(--text);
 }
 
-.date-control input,
+.date-control input[type="date"],
 .search-input,
 select {
   padding: 0 12px;
@@ -170,6 +177,7 @@ select {
 
 .toolbar-button,
 .download-button,
+.date-step-button,
 .lang-button,
 .range-button {
   padding: 0 14px;
@@ -177,12 +185,36 @@ select {
   transition: 160ms ease;
 }
 
+.date-control input[type="date"] {
+  min-width: 154px;
+}
+
+.date-step-button {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  background: rgba(255, 252, 245, 0.96);
+}
+
+.date-scrubber {
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+
 .toolbar-button:hover,
 .download-button:hover,
+.date-step-button:hover,
 .lang-button:hover,
 .range-button:hover,
 .toolbar-button:focus-visible,
 .download-button:focus-visible,
+.date-step-button:focus-visible,
 .lang-button:focus-visible,
 .range-button:focus-visible,
 .search-input:focus-visible,
@@ -191,6 +223,12 @@ input:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(31, 94, 122, 0.12);
+}
+
+.date-step-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .lang-button.active,
@@ -210,7 +248,7 @@ input:focus-visible {
   height: 100vh;
   padding-top: 74px;
   display: grid;
-  grid-template-columns: clamp(384px, 27vw, 424px) minmax(420px, 1fr) clamp(500px, 31vw, 560px);
+  grid-template-columns: clamp(404px, 28vw, 456px) minmax(420px, 1fr) clamp(520px, 32vw, 600px);
 }
 
 .sidebar,
@@ -378,6 +416,7 @@ h3 {
 
 .stat-range strong {
   font-size: 0.97rem;
+  line-height: 1.3;
 }
 
 .control-head,
@@ -630,6 +669,8 @@ h3 {
 .metadata-grid dd {
   margin: 4px 0 0;
   font-weight: 700;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
 }
 
 .chart-wrap {
@@ -687,20 +728,20 @@ table {
 }
 
 .event-card table {
-  min-width: 620px;
+  min-width: 540px;
 }
 
 th,
 td {
-  padding: 7px 6px;
+  padding: 6px 4px;
   border-bottom: 1px solid rgba(188, 174, 151, 0.62);
   text-align: left;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
 th {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -1000,12 +1041,14 @@ body.modal-open {
 }
 
 .theory-panel h2,
+.layers-panel h2,
 .image-panel h2 {
   margin-top: 8px;
   font-size: 1.7rem;
 }
 
 .theory-panel p,
+.layers-panel p,
 .image-panel p {
   color: var(--muted);
   line-height: 1.52;
@@ -1103,6 +1146,53 @@ body.modal-open {
   margin-top: 14px;
 }
 
+.layers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.layers-group {
+  border: 1px solid rgba(188, 174, 151, 0.82);
+  border-radius: 18px;
+  background: rgba(255, 252, 245, 0.78);
+  padding: 16px;
+}
+
+.layers-group h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.layer-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+}
+
+.layer-option + .layer-option {
+  border-top: 1px dashed rgba(188, 174, 151, 0.8);
+}
+
+.layer-option input {
+  margin-top: 2px;
+}
+
+.layer-option strong,
+.layer-option span {
+  display: block;
+}
+
+.layer-option small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.42;
+}
+
 .image-panel {
   width: min(1080px, calc(100vw - 40px));
 }
@@ -1161,6 +1251,24 @@ body.modal-open {
     flex-wrap: wrap;
   }
 
+  .date-navigator {
+    width: 100%;
+  }
+
+  .date-control {
+    flex: 1 1 auto;
+  }
+
+  .date-control input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .date-control input[type="date"] {
+    width: 100%;
+    min-width: 0;
+  }
+
   .app-shell {
     padding-top: 126px;
     display: block;
@@ -1217,6 +1325,7 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 
+  .layers-grid,
   .theory-grid {
     grid-template-columns: 1fr;
   }
