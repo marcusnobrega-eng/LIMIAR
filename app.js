@@ -42,6 +42,14 @@ const TEXT = {
     fitMapButton: 'Ajustar mapa',
     exportCsvButton: 'Exportar CSV',
     shareButton: 'Compartilhar',
+    mobileActionsButton: 'Mais ações',
+    mobileActionsEyebrow: 'Ações',
+    mobileActionsTitle: 'Mais ações',
+    mobileNavSearchButton: 'Busca',
+    mobileNavMapButton: 'Mapa',
+    mobileNavStationButton: 'Estação',
+    mobileNavDatasetButton: 'Conjunto',
+    mobileNavAria: 'Navegação mobile',
     eyebrowLabel: 'Atlas histórico e de triagem',
     heroTitle: 'Busca diária de estações com sinais de inundação',
     heroText: 'Selecione uma data para ver quais estações estão em condição normal, em alerta, inundadas ou em inundação extrema.',
@@ -140,6 +148,7 @@ const TEXT = {
     fatalTitle: 'Falha ao carregar o atlas',
     fatalMessage: 'Abra este site por um servidor local para que os arquivos de dados possam ser lidos.',
     fatalCommandLabel: 'No terminal, dentro da pasta docs, rode:',
+    loadMoreStations: 'Carregar mais',
     status: {
       all: 'Todos',
       normal: 'Normal',
@@ -322,6 +331,14 @@ const TEXT = {
     fitMapButton: 'Fit map',
     exportCsvButton: 'Export CSV',
     shareButton: 'Share',
+    mobileActionsButton: 'More actions',
+    mobileActionsEyebrow: 'Actions',
+    mobileActionsTitle: 'More actions',
+    mobileNavSearchButton: 'Search',
+    mobileNavMapButton: 'Map',
+    mobileNavStationButton: 'Station',
+    mobileNavDatasetButton: 'Dataset',
+    mobileNavAria: 'Mobile navigation',
     eyebrowLabel: 'Historical screening atlas',
     heroTitle: 'Daily search for stations with flood signals',
     heroText: 'Pick a date to see which stations are normal, in warning, flooded, or in extreme flooding.',
@@ -420,6 +437,7 @@ const TEXT = {
     fatalTitle: 'Atlas failed to load',
     fatalMessage: 'Open this site through a local web server so the browser can read the data files.',
     fatalCommandLabel: 'From the terminal, inside the docs folder, run:',
+    loadMoreStations: 'Load more',
     status: {
       all: 'All',
       normal: 'Normal',
@@ -727,6 +745,8 @@ const state = {
   stationCache: new Map(),
   charts: {},
   markersLayer: null,
+  markerBounds: null,
+  markerRenderer: null,
   currentRange: '90',
   basemap: 'osm',
   baseLayers: {},
@@ -735,12 +755,21 @@ const state = {
     summary: true,
     legend: true,
   },
+  activeMobileView: 'search',
+  mapInitialized: false,
+  mobileStationListPageSize: 60,
+  mobileStationListVisibleCount: 60,
+  mobileStationChartsDirty: false,
   dateScrubberTimer: null,
   dateStepHoldTimer: null,
   dateStepRepeatTimer: null,
   dateStepSuppressClick: false,
   dateStepBusy: false,
+  resizeTimer: null,
 };
+
+const MOBILE_BREAKPOINT = 920;
+const MOBILE_STATION_PAGE_SIZE = 60;
 
 const BASEMAP_DEFS = {
   osm: {
@@ -755,10 +784,7 @@ const BASEMAP_DEFS = {
   },
 };
 
-const map = L.map('map', {
-  preferCanvas: true,
-  zoomControl: true,
-}).setView([-14.5, -52.5], 4);
+let map = null;
 
 Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
   state.baseLayers[key] = L.tileLayer(config.url, {
@@ -766,7 +792,6 @@ Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
     maxZoom: config.maxZoom,
   });
 });
-state.baseLayers[state.basemap].addTo(map);
 
 function byId(id) {
   return document.getElementById(id);
@@ -782,6 +807,40 @@ function nestedText(group, key) {
 
 function qaPanelPartLabel(key) {
   return TEXT[state.lang].qaPanelParts?.[key] || key;
+}
+
+function isMobileLayout() {
+  return window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+function mobileViewClass(view) {
+  return `mobile-view-${view}`;
+}
+
+function syncLayoutMetrics() {
+  const topbar = document.querySelector('.topbar');
+  if (topbar) {
+    document.documentElement.style.setProperty('--header-height', `${Math.ceil(topbar.offsetHeight)}px`);
+  }
+  const nav = byId('mobileNav');
+  const navHeight = isMobileLayout() && nav ? Math.ceil(nav.offsetHeight || 0) : 0;
+  document.documentElement.style.setProperty('--mobile-nav-height', `${navHeight}px`);
+}
+
+function ensureMap() {
+  if (map) return map;
+  map = L.map('map', {
+    zoomControl: true,
+  }).setView([-14.5, -52.5], 4);
+  state.baseLayers[state.basemap].addTo(map);
+  state.markerRenderer = L.svg();
+  state.markerRenderer.addTo(map);
+  state.mapInitialized = true;
+  renderMap();
+  window.setTimeout(() => {
+    map.invalidateSize(false);
+  }, 80);
+  return map;
 }
 
 function isFiniteNumber(value) {
@@ -892,6 +951,10 @@ function openOverlay(id) {
   const node = byId(id);
   if (!node) return;
   node.hidden = false;
+  if (id === 'actionsOverlay') {
+    const mobileActionsButton = byId('mobileActionsButton');
+    if (mobileActionsButton) mobileActionsButton.setAttribute('aria-expanded', 'true');
+  }
   document.body.classList.add('modal-open');
 }
 
@@ -899,8 +962,111 @@ function closeOverlay(id) {
   const node = byId(id);
   if (!node) return;
   node.hidden = true;
+  if (id === 'actionsOverlay') {
+    const mobileActionsButton = byId('mobileActionsButton');
+    if (mobileActionsButton) mobileActionsButton.setAttribute('aria-expanded', 'false');
+  }
   if (!Array.from(document.querySelectorAll('.overlay')).some((overlay) => !overlay.hidden)) {
     document.body.classList.remove('modal-open');
+  }
+}
+
+function setActivePanel(panelId) {
+  document.querySelectorAll('.tabbar button').forEach((node) => node.classList.toggle('active', node.dataset.panel === panelId));
+  document.querySelectorAll('.panel-view').forEach((panel) => panel.classList.toggle('active', panel.id === panelId));
+}
+
+function syncMobileNavButtons() {
+  document.querySelectorAll('[data-mobile-view]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.mobileView === state.activeMobileView);
+  });
+}
+
+function renderSelectedStationHeavy(stationData) {
+  renderTimeseriesChart(stationData);
+  renderCrossSectionChart(stationData);
+  renderDynamicDailyChart(stationData);
+  renderRatingCurveChart(stationData);
+  renderEvidenceChart(stationData);
+  renderEventSummary(stationData);
+  renderSeasonality(stationData);
+  renderEventsTable(stationData);
+  renderQaSection(stationData);
+}
+
+function maybeRenderDeferredStationCharts() {
+  if (!state.selectedData) return;
+  if (isMobileLayout() && state.activeMobileView !== 'station') return;
+  if (!state.mobileStationChartsDirty && state.charts.timeseriesChart) return;
+  renderSelectedStationHeavy(state.selectedData);
+  state.mobileStationChartsDirty = false;
+}
+
+function renderSelectedStation(stationData, options = {}) {
+  const { deferHeavy = isMobileLayout() && state.activeMobileView !== 'station' } = options;
+  renderStatusCard(stationData);
+  renderMetadata(stationData);
+  if (deferHeavy) {
+    state.mobileStationChartsDirty = true;
+    return;
+  }
+  renderSelectedStationHeavy(stationData);
+  state.mobileStationChartsDirty = false;
+}
+
+function setMobileView(view) {
+  state.activeMobileView = view;
+  document.body.classList.remove(
+    mobileViewClass('search'),
+    mobileViewClass('map'),
+    mobileViewClass('station'),
+    mobileViewClass('dataset'),
+  );
+  if (isMobileLayout()) {
+    document.body.classList.add(mobileViewClass(view));
+  }
+  if (view === 'station') {
+    setActivePanel('stationPanel');
+    maybeRenderDeferredStationCharts();
+  }
+  if (view === 'dataset') {
+    setActivePanel('datasetPanel');
+    renderDatasetMetrics();
+  }
+  if (view === 'map') {
+    ensureMap();
+    renderMap();
+    window.setTimeout(() => {
+      if (map) map.invalidateSize(false);
+    }, 80);
+  }
+  syncMobileNavButtons();
+  syncLayoutMetrics();
+}
+
+function syncResponsiveLayout() {
+  const mobile = isMobileLayout();
+  document.body.classList.toggle('mobile-layout', mobile);
+  if (mobile) {
+    if (!['search', 'map', 'station', 'dataset'].includes(state.activeMobileView)) {
+      state.activeMobileView = state.selectedCode ? 'station' : 'search';
+    }
+    setMobileView(state.activeMobileView);
+  } else {
+    document.body.classList.remove(
+      mobileViewClass('search'),
+      mobileViewClass('map'),
+      mobileViewClass('station'),
+      mobileViewClass('dataset'),
+    );
+    syncMobileNavButtons();
+    ensureMap();
+    renderMap();
+    window.setTimeout(() => {
+      if (map) map.invalidateSize(false);
+    }, 80);
+    maybeRenderDeferredStationCharts();
+    syncLayoutMetrics();
   }
 }
 
@@ -947,9 +1113,13 @@ function renderTheoryModal() {
 
 function setBasemap(key) {
   if (!state.baseLayers[key] || state.basemap === key) return;
-  map.removeLayer(state.baseLayers[state.basemap]);
+  if (map) {
+    map.removeLayer(state.baseLayers[state.basemap]);
+  }
   state.basemap = key;
-  state.baseLayers[key].addTo(map);
+  if (map) {
+    state.baseLayers[key].addTo(map);
+  }
 }
 
 function applyMapVisibility() {
@@ -957,7 +1127,7 @@ function applyMapVisibility() {
   const legendCard = byId('legendCard');
   if (selectedCard) selectedCard.hidden = !state.mapVisibility.summary;
   if (legendCard) legendCard.hidden = !state.mapVisibility.legend;
-  renderMap();
+  if (state.mapInitialized) renderMap();
 }
 
 function renderLayersModal() {
@@ -1582,6 +1752,7 @@ function getStatusInfo(stationCode, dateString) {
 function applyStaticTranslations() {
   const keys = [
     'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton',
+    'mobileActionsButton', 'mobileActionsEyebrow', 'mobileActionsTitle', 'mobileNavSearchButton', 'mobileNavMapButton', 'mobileNavStationButton', 'mobileNavDatasetButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
@@ -1596,6 +1767,19 @@ function applyStaticTranslations() {
     const node = byId(id);
     if (node) node.textContent = text(id);
   });
+  const mobileActionMap = [
+    ['mobileTheoryButton', 'theoryButton'],
+    ['mobileLayersButton', 'layersButton'],
+    ['mobileFitMapButton', 'fitMapButton'],
+    ['mobileExportCsvButton', 'exportCsvButton'],
+    ['mobileShareButton', 'shareButton'],
+  ];
+  mobileActionMap.forEach(([id, key]) => {
+    const node = byId(id);
+    if (node) node.textContent = text(key);
+  });
+  const mobileNav = byId('mobileNav');
+  if (mobileNav) mobileNav.setAttribute('aria-label', text('mobileNavAria'));
   byId('stationSearch').placeholder = text('searchPlaceholder');
   const prevDateButton = byId('prevDateButton');
   const nextDateButton = byId('nextDateButton');
@@ -1640,6 +1824,8 @@ function applyStaticTranslations() {
   if (imageClose) imageClose.setAttribute('aria-label', text('closeLabel'));
   const layersClose = byId('closeLayersButton');
   if (layersClose) layersClose.setAttribute('aria-label', text('closeLabel'));
+  const actionsClose = byId('closeActionsButton');
+  if (actionsClose) actionsClose.setAttribute('aria-label', text('closeLabel'));
   renderTheoryModal();
   renderLayersModal();
   document.title = text('pageTitle');
@@ -1820,6 +2006,9 @@ function applyFilters() {
     if (filters.biome !== 'all' && station.biome !== filters.biome) return false;
     return true;
   });
+  if (isMobileLayout()) {
+    state.mobileStationListVisibleCount = MOBILE_STATION_PAGE_SIZE;
+  }
   renderStationList();
   renderMap();
   renderDatasetMetrics();
@@ -1827,8 +2016,12 @@ function applyFilters() {
 
 function renderStationList() {
   const list = byId('stationList');
+  const loadMoreButton = byId('stationLoadMoreButton');
   list.innerHTML = '';
-  state.filteredStations.forEach((station) => {
+  const visibleStations = isMobileLayout()
+    ? state.filteredStations.slice(0, state.mobileStationListVisibleCount)
+    : state.filteredStations;
+  visibleStations.forEach((station) => {
     const info = getStatusInfo(station.station_code, state.selectedDate);
     const basisKey = resolvedBasisKey(info.basis, station.threshold_basis);
     const button = document.createElement('button');
@@ -1847,11 +2040,25 @@ function renderStationList() {
     button.addEventListener('click', () => selectStation(station.station_code));
     list.appendChild(button);
   });
-  byId('visibleCount').textContent = `${state.filteredStations.length} ${text('visibleStations')}`;
+  const renderedCount = visibleStations.length;
+  byId('visibleCount').textContent = isMobileLayout()
+    ? `${renderedCount} / ${state.filteredStations.length} ${text('visibleStations')}`
+    : `${state.filteredStations.length} ${text('visibleStations')}`;
   byId('listCount').textContent = formatNumber(state.filteredStations.length);
+  if (loadMoreButton) {
+    const remaining = Math.max(0, state.filteredStations.length - renderedCount);
+    if (isMobileLayout() && remaining > 0) {
+      const nextCount = Math.min(state.mobileStationListPageSize, remaining);
+      loadMoreButton.textContent = `${text('loadMoreStations')} (${nextCount})`;
+      loadMoreButton.hidden = false;
+    } else {
+      loadMoreButton.hidden = true;
+    }
+  }
 }
 
 function renderMap() {
+  if (!state.mapInitialized || !map) return;
   if (state.markersLayer) state.markersLayer.remove();
   state.markersLayer = L.layerGroup();
   if (!state.mapVisibility.stations) {
@@ -1865,6 +2072,7 @@ function renderMap() {
     const basisKey = resolvedBasisKey(info.basis, station.threshold_basis);
     const marker = L.circleMarker([station.lat, station.lon], {
       radius: markerRadius(station),
+      renderer: state.markerRenderer || undefined,
       color: '#fffdf6',
       weight: 1.3,
       fillColor: STATUS_COLORS[info.status],
@@ -1883,6 +2091,13 @@ function renderMap() {
   });
   state.markersLayer.addTo(map);
   state.markerBounds = markers.length ? L.featureGroup(markers).getBounds() : null;
+  window.requestAnimationFrame(() => {
+    if (!map) return;
+    map.invalidateSize(false);
+    state.markersLayer?.eachLayer((layer) => {
+      if (typeof layer.redraw === 'function') layer.redraw();
+    });
+  });
 }
 
 function renderGlobalStats() {
@@ -1956,6 +2171,7 @@ function renderMetricArticles(container, items) {
 }
 
 function renderDatasetMetrics() {
+  if (!state.manifest) return;
   const allStations = state.stations || [];
   const totalCount = allStations.length || Number(state.manifest?.published_station_count || 0);
   const hydraulicCount = allStations.filter((station) => station.threshold_basis === 'hydraulic').length;
@@ -3048,12 +3264,20 @@ function renderSeasonality(stationData) {
 
 function renderEventsTable(stationData) {
   const body = byId('eventTableBody');
+  const mobileList = byId('eventMobileList');
   body.innerHTML = '';
+  if (mobileList) mobileList.innerHTML = '';
   const events = normalizedEventRows(stationData);
   if (!events.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td colspan="5">-</td>';
     body.appendChild(tr);
+    if (mobileList) {
+      const empty = document.createElement('div');
+      empty.className = 'mobile-event-item';
+      empty.textContent = '-';
+      mobileList.appendChild(empty);
+    }
     return;
   }
   events.forEach((event) => {
@@ -3070,6 +3294,37 @@ function renderEventsTable(stationData) {
       <td>${classText}</td>
     `;
     body.appendChild(tr);
+    if (mobileList) {
+      const card = document.createElement('article');
+      card.className = 'mobile-event-item';
+      card.innerHTML = `
+        <div class="mobile-event-dates">
+          <div class="mobile-event-block">
+            <span>${text('thStartDate')}</span>
+            <strong>${formatShortDate(event.event_start)}</strong>
+          </div>
+          <div class="mobile-event-block">
+            <span>${text('thPeakDate')}</span>
+            <strong>${formatShortDate(event.peak_date)}</strong>
+          </div>
+        </div>
+        <div class="mobile-event-kpis">
+          <div class="mobile-event-block">
+            <span>${text('thDuration')}</span>
+            <strong>${formatDuration(event.duration_days)}</strong>
+          </div>
+          <div class="mobile-event-block">
+            <span>${text('thPeak')}</span>
+            <strong>${peakValue}</strong>
+          </div>
+          <div class="mobile-event-block">
+            <span>${text('thClass')}</span>
+            <strong>${classText}</strong>
+          </div>
+        </div>
+      `;
+      mobileList.appendChild(card);
+    }
   });
 }
 
@@ -3149,6 +3404,7 @@ function renderQaSection(stationData) {
 }
 
 function renderEmptySelection() {
+  state.mobileStationChartsDirty = false;
   byId('selectedStatusTitle').textContent = text('selectedStatusTitle');
   byId('selectedStatusSubtitle').textContent = text('selectedStatusSubtitle');
   byId('selectedMetricStatus').textContent = '-';
@@ -3160,6 +3416,7 @@ function renderEmptySelection() {
   byId('qaFlags').innerHTML = '';
   byId('eventMetrics').innerHTML = '';
   byId('eventTableBody').innerHTML = '';
+  byId('eventMobileList').innerHTML = '';
   byId('crossSectionChart').hidden = true;
   byId('crossSectionEmpty').hidden = true;
   destroyChart('crossSectionChart');
@@ -3189,24 +3446,18 @@ function renderEmptySelection() {
 
 async function selectStation(stationCode) {
   state.selectedCode = stationCode;
+  if (isMobileLayout()) {
+    setMobileView('station');
+  }
   renderStationList();
   const station = state.stationByCode.get(stationCode);
   if (!station) return;
   updateUrl();
   showToast(TEXT[state.lang].toasts.loading, 900);
   const data = await loadStationData(stationCode);
+  if (state.selectedCode !== stationCode) return;
   state.selectedData = data;
-  renderStatusCard(data);
-  renderMetadata(data);
-  renderTimeseriesChart(data);
-  renderCrossSectionChart(data);
-  renderDynamicDailyChart(data);
-  renderRatingCurveChart(data);
-  renderEvidenceChart(data);
-  renderEventSummary(data);
-  renderSeasonality(data);
-  renderEventsTable(data);
-  renderQaSection(data);
+  renderSelectedStation(data);
 }
 
 function updateUrl() {
@@ -3218,6 +3469,8 @@ function updateUrl() {
 }
 
 function fitMapToFiltered() {
+  ensureMap();
+  renderMap();
   if (state.markerBounds) {
     map.fitBounds(state.markerBounds.pad(0.15));
   }
@@ -3246,7 +3499,12 @@ async function setSelectedDate(dateString, preserveSelection = true) {
   if (preserveSelection && state.selectedCode) {
     if (state.selectedData) {
       renderStatusCard(state.selectedData);
-      renderTimeseriesChart(state.selectedData);
+      if (!isMobileLayout() || state.activeMobileView === 'station') {
+        renderTimeseriesChart(state.selectedData);
+        state.mobileStationChartsDirty = false;
+      } else {
+        state.mobileStationChartsDirty = true;
+      }
     } else {
       await selectStation(state.selectedCode);
     }
@@ -4222,6 +4480,13 @@ function wireEvents() {
     byId(id).addEventListener('input', applyFilters);
     byId(id).addEventListener('change', applyFilters);
   });
+  const loadMoreButton = byId('stationLoadMoreButton');
+  if (loadMoreButton) {
+    loadMoreButton.addEventListener('click', () => {
+      state.mobileStationListVisibleCount += state.mobileStationListPageSize;
+      renderStationList();
+    });
+  }
   byId('datePicker').addEventListener('change', async (event) => {
     if (event.target.value) await setSelectedDate(event.target.value);
   });
@@ -4249,17 +4514,51 @@ function wireEvents() {
   const nextDateButton = byId('nextDateButton');
   bindDateStepButton(prevDateButton, -1);
   bindDateStepButton(nextDateButton, 1);
-  byId('theoryButton').addEventListener('click', () => openOverlay('theoryOverlay'));
-  byId('layersButton').addEventListener('click', () => {
+
+  const openTheory = () => {
+    closeOverlay('actionsOverlay');
+    openOverlay('theoryOverlay');
+  };
+  const openLayers = () => {
+    closeOverlay('actionsOverlay');
     renderLayersModal();
     openOverlay('layersOverlay');
-  });
-  byId('fitMapButton').addEventListener('click', fitMapToFiltered);
-  byId('exportCsvButton').addEventListener('click', exportFilteredCsv);
-  byId('shareButton').addEventListener('click', async () => {
+  };
+  const fitMapAction = () => {
+    if (isMobileLayout()) setMobileView('map');
+    closeOverlay('actionsOverlay');
+    fitMapToFiltered();
+  };
+  const exportCsvAction = () => {
+    closeOverlay('actionsOverlay');
+    exportFilteredCsv();
+  };
+  const shareAction = async () => {
     await navigator.clipboard.writeText(window.location.href);
     showToast(TEXT[state.lang].toasts.copied);
+    closeOverlay('actionsOverlay');
+  };
+  [
+    ['theoryButton', openTheory],
+    ['mobileTheoryButton', openTheory],
+    ['layersButton', openLayers],
+    ['mobileLayersButton', openLayers],
+    ['fitMapButton', fitMapAction],
+    ['mobileFitMapButton', fitMapAction],
+    ['exportCsvButton', exportCsvAction],
+    ['mobileExportCsvButton', exportCsvAction],
+  ].forEach(([id, handler]) => {
+    const node = byId(id);
+    if (node) node.addEventListener('click', handler);
   });
+  ['shareButton', 'mobileShareButton'].forEach((id) => {
+    const node = byId(id);
+    if (node) node.addEventListener('click', shareAction);
+  });
+  const mobileActionsButton = byId('mobileActionsButton');
+  if (mobileActionsButton) {
+    mobileActionsButton.addEventListener('click', () => openOverlay('actionsOverlay'));
+  }
   byId('exportStationDataButton').addEventListener('click', exportStationDataPackage);
   Object.keys(STATION_CSV_EXPORTS).forEach((id) => {
     const button = byId(id);
@@ -4272,6 +4571,7 @@ function wireEvents() {
   byId('closeTheoryButton').addEventListener('click', () => closeOverlay('theoryOverlay'));
   byId('closeLayersButton').addEventListener('click', () => closeOverlay('layersOverlay'));
   byId('closeImageButton').addEventListener('click', () => closeOverlay('imageOverlay'));
+  byId('closeActionsButton').addEventListener('click', () => closeOverlay('actionsOverlay'));
   document.querySelectorAll('[data-overlay-close]').forEach((button) => {
     button.addEventListener('click', () => closeOverlay(button.dataset.overlayClose));
   });
@@ -4280,6 +4580,7 @@ function wireEvents() {
     closeOverlay('theoryOverlay');
     closeOverlay('layersOverlay');
     closeOverlay('imageOverlay');
+    closeOverlay('actionsOverlay');
   });
   document.querySelectorAll('.lang-button').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -4291,35 +4592,40 @@ function wireEvents() {
       renderGlobalStats();
       applyFilters();
       if (state.selectedData) {
-        renderStatusCard(state.selectedData);
-        renderMetadata(state.selectedData);
-        renderTimeseriesChart(state.selectedData);
-        renderCrossSectionChart(state.selectedData);
-        renderDynamicDailyChart(state.selectedData);
-        renderRatingCurveChart(state.selectedData);
-        renderEvidenceChart(state.selectedData);
-        renderEventSummary(state.selectedData);
-        renderSeasonality(state.selectedData);
-        renderEventsTable(state.selectedData);
-        renderQaSection(state.selectedData);
+        renderSelectedStation(state.selectedData);
       } else {
         renderEmptySelection();
       }
       updateUrl();
+      syncLayoutMetrics();
     });
   });
   document.querySelectorAll('.range-button').forEach((button) => {
     button.addEventListener('click', () => {
       state.currentRange = button.dataset.range;
       document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node === button));
-      if (state.selectedData) renderTimeseriesChart(state.selectedData);
+      if (!state.selectedData) return;
+      if (!isMobileLayout() || state.activeMobileView === 'station') {
+        renderTimeseriesChart(state.selectedData);
+        state.mobileStationChartsDirty = false;
+      } else {
+        state.mobileStationChartsDirty = true;
+      }
     });
   });
   document.querySelectorAll('.tabbar button').forEach((button) => {
     button.addEventListener('click', () => {
-      document.querySelectorAll('.tabbar button').forEach((node) => node.classList.toggle('active', node === button));
-      document.querySelectorAll('.panel-view').forEach((panel) => panel.classList.toggle('active', panel.id === button.dataset.panel));
+      setActivePanel(button.dataset.panel);
     });
+  });
+  document.querySelectorAll('[data-mobile-view]').forEach((button) => {
+    button.addEventListener('click', () => setMobileView(button.dataset.mobileView));
+  });
+  window.addEventListener('resize', () => {
+    if (state.resizeTimer) window.clearTimeout(state.resizeTimer);
+    state.resizeTimer = window.setTimeout(() => {
+      syncResponsiveLayout();
+    }, 120);
   });
 }
 
@@ -4327,6 +4633,8 @@ async function boot() {
   ensureDateNavigator();
   applyStaticTranslations();
   updateLanguageButtons();
+  syncLayoutMetrics();
+  syncResponsiveLayout();
   renderLegend();
   applyMapVisibility();
   renderEmptySelection();
@@ -4347,11 +4655,13 @@ async function boot() {
   renderGlobalStats();
 
   const urlState = parseUrlState();
+  state.activeMobileView = urlState.station ? 'station' : 'search';
   if (urlState.lang && TEXT[urlState.lang]) {
     state.lang = urlState.lang;
     applyStaticTranslations();
     updateLanguageButtons();
   }
+  syncResponsiveLayout();
   populateFilters();
   byId('qaFilter').value = 'screening_ok';
 
@@ -4368,12 +4678,13 @@ async function boot() {
   const defaultStation = state.stationByCode.has(DEFAULT_STATION_CODE)
     ? DEFAULT_STATION_CODE
     : (state.filteredStations[0]?.station_code || state.stations[0]?.station_code);
-  const initialStation = urlState.station || defaultStation;
+  const initialStation = urlState.station || (!isMobileLayout() ? defaultStation : null);
   if (initialStation) {
     await selectStation(initialStation);
   } else {
     renderDatasetMetrics();
   }
+  syncResponsiveLayout();
 }
 
 boot().catch((error) => {
