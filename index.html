@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=12" />
+    <link rel="stylesheet" href="styles.css?v=13" />
   </head>
   <body>
     <header class="topbar">
@@ -23,35 +23,38 @@
       </a>
       <div class="topbar-controls">
         <div class="date-navigator" role="group" aria-labelledby="dateLabel">
-          <button class="date-step-button" id="prevDateButton" type="button" aria-label="Dia anterior" title="Dia anterior">
+          <button class="date-step-button" id="prevDateButton" type="button" aria-label="Previous day" title="Previous day">
             <span aria-hidden="true">&larr;</span>
           </button>
           <label class="date-control">
-            <span id="dateLabel">Data</span>
+            <span id="dateLabel">Date</span>
             <input id="datePicker" type="date" />
-            <input id="dateScrubber" class="date-scrubber" type="range" min="0" max="0" value="0" step="1" aria-label="Controle de rolagem da data" />
+            <input id="dateScrubber" class="date-scrubber" type="range" min="0" max="0" value="0" step="1" aria-label="Date scrubber" />
           </label>
-          <button class="date-step-button" id="nextDateButton" type="button" aria-label="Próximo dia" title="Próximo dia">
+          <button class="date-step-button" id="nextDateButton" type="button" aria-label="Next day" title="Next day">
             <span aria-hidden="true">&rarr;</span>
           </button>
         </div>
-        <div class="language-switch" role="group" aria-label="Language switch">
-          <button type="button" class="lang-button active" data-lang="pt">PT</button>
-          <button type="button" class="lang-button" data-lang="en">EN</button>
+        <div class="language-switch" role="group" aria-label="Language">
+          <button type="button" class="lang-button active" data-lang="en" aria-label="English">
+            <span class="lang-flag" aria-hidden="true">🇺🇸</span>
+            <span class="lang-code">EN</span>
+          </button>
+          <button type="button" class="lang-button" data-lang="pt" aria-label="Portuguese">
+            <span class="lang-flag" aria-hidden="true">🇧🇷</span>
+            <span class="lang-code">PT</span>
+          </button>
         </div>
-        <button class="toolbar-button mobile-actions-button" id="mobileActionsButton" type="button" aria-haspopup="dialog" aria-expanded="false">Mais ações</button>
-        <div class="desktop-actions">
-          <button class="toolbar-button" id="theoryButton" type="button">Como funciona</button>
-          <button class="toolbar-button" id="layersButton" type="button">Camadas</button>
-          <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
-          <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
-          <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
-        </div>
+        <button class="toolbar-button" id="theoryButton" type="button">How it works</button>
+        <button class="toolbar-button" id="layersButton" type="button">Camadas</button>
+        <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
+        <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
+        <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
       </div>
     </header>
 
     <main class="app-shell">
-      <aside class="sidebar" id="searchView">
+      <aside class="sidebar">
         <section class="hero-card">
           <span class="eyebrow" id="eyebrowLabel">Atlas histórico e de triagem</span>
           <h1 id="heroTitle">Busca diária de estações com sinais de inundação</h1>
@@ -148,11 +151,10 @@
             <span id="listCount">-</span>
           </div>
           <div class="station-list" id="stationList"></div>
-          <button class="toolbar-button load-more-button" id="stationLoadMoreButton" type="button" hidden>Carregar mais</button>
         </section>
       </aside>
 
-      <section class="map-stage" id="mapView">
+      <section class="map-stage">
         <div id="map"></div>
         <section class="floating-card selected-card" id="selectedCard">
           <span class="eyebrow" id="selectedStatusEyebrow">Status da data</span>
@@ -179,7 +181,7 @@
         </section>
       </section>
 
-      <aside class="detail-panel" id="detailView">
+      <aside class="detail-panel">
         <div class="tabbar">
           <button class="active" type="button" data-panel="stationPanel" id="stationTabButton">Estação</button>
           <button type="button" data-panel="datasetPanel" id="datasetTabButton">Conjunto</button>
@@ -314,7 +316,6 @@
               <h3 id="recentEventsTitle">Eventos recentes e significativos</h3>
               <button class="toolbar-button section-button" id="exportEventsCsvButton" type="button">Baixar CSV</button>
             </div>
-            <div class="mobile-event-list" id="eventMobileList"></div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -407,20 +408,38 @@
       </aside>
     </main>
 
-    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation">
-      <button class="mobile-nav-button active" id="mobileNavSearchButton" data-mobile-view="search" type="button">Busca</button>
-      <button class="mobile-nav-button" id="mobileNavMapButton" data-mobile-view="map" type="button">Mapa</button>
-      <button class="mobile-nav-button" id="mobileNavStationButton" data-mobile-view="station" type="button">Estação</button>
-      <button class="mobile-nav-button" id="mobileNavDatasetButton" data-mobile-view="dataset" type="button">Conjunto</button>
-    </nav>
-
     <div class="overlay" id="theoryOverlay" hidden>
       <div class="overlay-backdrop" data-overlay-close="theoryOverlay"></div>
-      <section class="overlay-panel theory-panel" role="dialog" aria-modal="true" aria-labelledby="theoryTitle">
+      <section class="overlay-panel guide-panel" role="dialog" aria-modal="true" aria-labelledby="guideTitle" aria-describedby="guideText">
         <button class="overlay-close" id="closeTheoryButton" type="button" aria-label="Fechar">&times;</button>
-        <span class="eyebrow" id="theoryEyebrow">Como o atlas funciona</span>
-        <h2 id="theoryTitle">Teoria e fluxo de reconstrução</h2>
-        <div id="theoryBody"></div>
+        <div class="guide-shell">
+          <div class="guide-header-row">
+            <span class="guide-badge" id="guideBadge">Comece aqui</span>
+            <div class="guide-progress" id="guideProgress" role="tablist" aria-label="Passos do guia"></div>
+          </div>
+          <div class="guide-content">
+            <div class="guide-copy">
+              <span class="eyebrow guide-eyebrow" id="guideEyebrow">O que é o LIMIAR</span>
+              <h2 id="guideTitle" tabindex="-1">Um atlas histórico para entender sinais de inundação</h2>
+              <p class="guide-text" id="guideText"></p>
+              <div class="guide-highlight-grid" id="guideHighlights"></div>
+              <div class="guide-class-grid" id="guideClasses" hidden></div>
+              <p class="guide-step-note" id="guideNote" hidden></p>
+            </div>
+            <figure class="guide-visual-card" id="guideVisualCard">
+              <img class="guide-lockup" id="guideLockup" src="assets/limiar-lockup.svg" alt="LIMIAR" />
+              <img class="guide-visual-image" id="guideVisualImage" alt="" hidden />
+              <figcaption id="guideVisualCaption"></figcaption>
+            </figure>
+          </div>
+          <div class="guide-footer">
+            <button class="toolbar-button guide-tertiary" id="guideSkipButton" type="button">Pular para o atlas</button>
+            <div class="guide-footer-nav">
+              <button class="toolbar-button" id="guidePrevButton" type="button">Voltar</button>
+              <button class="toolbar-button guide-primary" id="guideNextButton" type="button">Próximo</button>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -444,27 +463,11 @@
       </section>
     </div>
 
-    <div class="overlay" id="actionsOverlay" hidden>
-      <div class="overlay-backdrop" data-overlay-close="actionsOverlay"></div>
-      <section class="overlay-panel actions-panel" role="dialog" aria-modal="true" aria-labelledby="mobileActionsTitle">
-        <button class="overlay-close" id="closeActionsButton" type="button" aria-label="Fechar">&times;</button>
-        <span class="eyebrow" id="mobileActionsEyebrow">Ações</span>
-        <h2 id="mobileActionsTitle">Mais ações</h2>
-        <div class="mobile-actions-list">
-          <button class="toolbar-button mobile-action-item" id="mobileTheoryButton" type="button">Como funciona</button>
-          <button class="toolbar-button mobile-action-item" id="mobileLayersButton" type="button">Camadas</button>
-          <button class="toolbar-button mobile-action-item" id="mobileFitMapButton" type="button">Ajustar mapa</button>
-          <button class="toolbar-button mobile-action-item" id="mobileExportCsvButton" type="button">Exportar CSV</button>
-          <button class="toolbar-button mobile-action-item" id="mobileShareButton" type="button">Compartilhar</button>
-        </div>
-      </section>
-    </div>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=15"></script>
   </body>
 </html>

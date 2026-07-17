@@ -21,6 +21,16 @@ const STATUS_COLORS = {
   no_data: '#97A3A8',
 };
 
+const MARKER_RADIUS_BASE = 6.5;
+
+const STATUS_RADIUS_MULTIPLIER = {
+  normal: 1,
+  warning: 2,
+  flooded: 2.5,
+  extreme_flooding: 3,
+  no_data: 1,
+};
+
 const QA_PANEL_PARTS = [
   { key: 'cross_section', className: 'qa-subpanel-top-left', col: 0, row: 0 },
   { key: 'daily_exceedance', className: 'qa-subpanel-top-right', col: 1, row: 0 },
@@ -33,6 +43,9 @@ const TEXT = {
     pageTitle: 'LIMIAR',
     brandTitle: 'LIMIAR',
     brandSubtitle: 'Levels and Indicators for Monitoring Inundation Across Rivers',
+    languageSwitchLabel: 'Idioma',
+    languageLabelPt: 'Português',
+    languageLabelEn: 'Inglês',
     dateLabel: 'Data',
     previousDateLabel: 'Dia anterior',
     nextDateLabel: 'Próximo dia',
@@ -42,14 +55,6 @@ const TEXT = {
     fitMapButton: 'Ajustar mapa',
     exportCsvButton: 'Exportar CSV',
     shareButton: 'Compartilhar',
-    mobileActionsButton: 'Mais ações',
-    mobileActionsEyebrow: 'Ações',
-    mobileActionsTitle: 'Mais ações',
-    mobileNavSearchButton: 'Busca',
-    mobileNavMapButton: 'Mapa',
-    mobileNavStationButton: 'Estação',
-    mobileNavDatasetButton: 'Conjunto',
-    mobileNavAria: 'Navegação mobile',
     eyebrowLabel: 'Atlas histórico e de triagem',
     heroTitle: 'Busca diária de estações com sinais de inundação',
     heroText: 'Selecione uma data para ver quais estações estão em condição normal, em alerta, inundadas ou em inundação extrema.',
@@ -127,7 +132,7 @@ const TEXT = {
     noQaFlags: 'Nenhuma flag adicional registrada.',
     noQaPanel: '',
     emptyEvidence: 'Sem intervalos suficientes para resumir a evolução dos limiares nesta estação.',
-    legendPointNote: 'Todos os pontos têm o mesmo tamanho. A cor mostra a classe do dia.',
+    legendPointNote: 'Pontos maiores indicam classes mais severas no dia selecionado. A cor continua mostrando a classe diária.',
     layersEyebrow: 'Mapa',
     layersTitle: 'Mapa base e camadas visíveis',
     layersBaseTitle: 'Mapa base',
@@ -147,8 +152,7 @@ const TEXT = {
     closeLabel: 'Fechar',
     fatalTitle: 'Falha ao carregar o atlas',
     fatalMessage: 'Abra este site por um servidor local para que os arquivos de dados possam ser lidos.',
-    fatalCommandLabel: 'No terminal, dentro da pasta docs, rode:',
-    loadMoreStations: 'Carregar mais',
+    fatalCommandLabel: 'No terminal, dentro da pasta github/LIMIAR, rode:',
     status: {
       all: 'Todos',
       normal: 'Normal',
@@ -322,6 +326,9 @@ const TEXT = {
     pageTitle: 'LIMIAR',
     brandTitle: 'LIMIAR',
     brandSubtitle: 'Levels and Indicators for Monitoring Inundation Across Rivers',
+    languageSwitchLabel: 'Language',
+    languageLabelPt: 'Portuguese',
+    languageLabelEn: 'English',
     dateLabel: 'Date',
     previousDateLabel: 'Previous day',
     nextDateLabel: 'Next day',
@@ -331,14 +338,6 @@ const TEXT = {
     fitMapButton: 'Fit map',
     exportCsvButton: 'Export CSV',
     shareButton: 'Share',
-    mobileActionsButton: 'More actions',
-    mobileActionsEyebrow: 'Actions',
-    mobileActionsTitle: 'More actions',
-    mobileNavSearchButton: 'Search',
-    mobileNavMapButton: 'Map',
-    mobileNavStationButton: 'Station',
-    mobileNavDatasetButton: 'Dataset',
-    mobileNavAria: 'Mobile navigation',
     eyebrowLabel: 'Historical screening atlas',
     heroTitle: 'Daily search for stations with flood signals',
     heroText: 'Pick a date to see which stations are normal, in warning, flooded, or in extreme flooding.',
@@ -416,7 +415,7 @@ const TEXT = {
     noQaFlags: 'No additional flags recorded.',
     noQaPanel: '',
     emptyEvidence: 'Not enough intervals are available to summarize threshold evolution for this station.',
-    legendPointNote: 'All points use the same size. Color shows the selected-day class.',
+    legendPointNote: 'Larger points indicate more severe classes on the selected day. Color still shows the daily class.',
     layersEyebrow: 'Map',
     layersTitle: 'Basemap and visible layers',
     layersBaseTitle: 'Basemap',
@@ -436,8 +435,7 @@ const TEXT = {
     closeLabel: 'Close',
     fatalTitle: 'Atlas failed to load',
     fatalMessage: 'Open this site through a local web server so the browser can read the data files.',
-    fatalCommandLabel: 'From the terminal, inside the docs folder, run:',
-    loadMoreStations: 'Load more',
+    fatalCommandLabel: 'From the terminal, inside the github/LIMIAR folder, run:',
     status: {
       all: 'All',
       normal: 'Normal',
@@ -609,6 +607,162 @@ const TEXT = {
   },
 };
 
+const GUIDE_SEEN_VERSION = 'v2';
+
+const GUIDE_IMAGES = {
+  pt: {
+    dateStatus: 'assets/guide-step-date-status-pt.png',
+    filtersMap: 'assets/guide-step-filters-map-pt.png',
+    stationDetail: 'assets/guide-step-station-detail-pt.png',
+  },
+  en: {
+    dateStatus: 'assets/guide-step-date-status-en.png',
+    filtersMap: 'assets/guide-step-filters-map-en.png',
+    stationDetail: 'assets/guide-step-station-detail-en.png',
+  },
+};
+
+const GUIDE_CONTENT = {
+  pt: {
+    badge: 'Comece aqui',
+    progressLabel: 'Passos do guia',
+    skip: 'Pular para o atlas',
+    back: 'Voltar',
+    next: 'Próximo',
+    finish: 'Começar a explorar',
+    close: 'Fechar guia',
+    steps: [
+      {
+        eyebrow: 'O que é o LIMIAR',
+        title: 'Um atlas histórico para entender sinais de inundação',
+        text: 'O LIMIAR reúne registros diários, limiares hidráulicos e contexto das estações para mostrar como cada local se comportou em uma data do arquivo histórico.',
+        visual: 'lockup',
+        visualCaption: 'Busca diária, mapa nacional e evidência hidráulica reunidos em uma única interface.',
+        highlights: [
+          { title: 'Busca diária', text: 'Escolha uma data e veja o retrato daquele dia.' },
+          { title: 'Mapa nacional', text: 'Compare padrões espaciais e estações em poucos cliques.' },
+          { title: 'Painéis da estação', text: 'Abra séries, eventos, seções, curva-chave e exportações.' },
+        ],
+      },
+      {
+        eyebrow: 'Escolha a data',
+        title: 'Selecione um dia e entenda as classes',
+        text: 'Use o campo de data ou a barra de rolagem para mudar o dia. A cor de cada ponto mostra a condição daquela estação na data escolhida.',
+        visual: 'image',
+        image: GUIDE_IMAGES.pt.dateStatus,
+        imageAlt: 'Controle de data, cartão de status e legenda de classes do LIMIAR.',
+        visualCaption: 'A data escolhida muda o retrato nacional e a classe diária mostrada no mapa.',
+        classes: [
+          { key: 'normal', text: 'Há leitura válida e nenhum limiar foi excedido.' },
+          { key: 'warning', text: 'O nível de alerta foi atingido, mas não o de inundação.' },
+          { key: 'flooded', text: 'O limiar de inundação foi excedido.' },
+          { key: 'extreme_flooding', text: 'O limiar severo foi excedido.' },
+          { key: 'no_data', text: 'Não havia leitura válida para a estação naquele dia.' },
+        ],
+        note: 'Sem dados não significa estação inexistente. Significa apenas ausência de leitura válida na data selecionada.',
+      },
+      {
+        eyebrow: 'Filtre e explore',
+        title: 'Use busca, filtros e mapa juntos',
+        text: 'Você pode filtrar por UF, bacia, bioma, evidência hidráulica e outros campos para reduzir a lista e ver o retrato espacial daquele dia.',
+        visual: 'image',
+        image: GUIDE_IMAGES.pt.filtersMap,
+        imageAlt: 'Painel de busca e filtros do LIMIAR ao lado do mapa nacional.',
+        visualCaption: 'A lista e o mapa trabalham juntos para destacar apenas o subconjunto que interessa.',
+        highlights: [
+          { title: 'Busca rápida', text: 'Procure por código, nome, município ou bacia.' },
+          { title: 'Filtros temáticos', text: 'Refine por status, tipo de limiar, UF, bacia e bioma.' },
+          { title: 'Retrato do dia', text: 'O mapa mostra o resultado da data escolhida, não um alerta em tempo real.' },
+        ],
+      },
+      {
+        eyebrow: 'Abra uma estação',
+        title: 'Veja séries, evidências e exporte resultados',
+        text: 'Ao clicar em uma estação, o painel mostra a série temporal, as seções transversais, a curva-chave, os eventos reconstruídos e os arquivos para exportação.',
+        visual: 'image',
+        image: GUIDE_IMAGES.pt.stationDetail,
+        imageAlt: 'Painel de estação do LIMIAR com status, metadados e gráficos.',
+        visualCaption: 'Cada estação reúne o histórico diário, a evidência hidráulica e as saídas para compartilhar.',
+        highlights: [
+          { title: 'Série temporal', text: 'Veja o comportamento diário com os limiares sobrepostos.' },
+          { title: 'Evidência hidráulica', text: 'Abra seções transversais, curva-chave e evolução dos limiares.' },
+          { title: 'Exportações', text: 'Baixe CSVs ou gere um resumo DOCX da estação.' },
+        ],
+        note: 'O LIMIAR é um atlas histórico para análise e comunicação. Ele não substitui operação oficial de alerta em tempo real.',
+      },
+    ],
+  },
+  en: {
+    badge: 'Start here',
+    progressLabel: 'Guide steps',
+    skip: 'Skip to atlas',
+    back: 'Back',
+    next: 'Next',
+    finish: 'Start exploring',
+    close: 'Close guide',
+    steps: [
+      {
+        eyebrow: 'What LIMIAR is',
+        title: 'A historical atlas for understanding flood signals',
+        text: 'LIMIAR brings together daily records, hydraulic thresholds, and station context so you can see how each location behaved on a given day in the historical archive.',
+        visual: 'lockup',
+        visualCaption: 'Daily lookup, national map, and hydraulic evidence in one interface.',
+        highlights: [
+          { title: 'Daily lookup', text: 'Pick a date and see the picture for that day.' },
+          { title: 'National map', text: 'Compare stations and spatial patterns in a few clicks.' },
+          { title: 'Station panels', text: 'Open time series, events, cross sections, rating curves, and exports.' },
+        ],
+      },
+      {
+        eyebrow: 'Choose the date',
+        title: 'Pick a day and read the classes clearly',
+        text: 'Use the date field or the scroll bar to move through time. Each point color shows the condition of that station on the chosen day.',
+        visual: 'image',
+        image: GUIDE_IMAGES.en.dateStatus,
+        imageAlt: 'Date control, status card, and class legend in LIMIAR.',
+        visualCaption: 'The selected date changes the national view and the daily class shown on the map.',
+        classes: [
+          { key: 'normal', text: 'A valid reading exists and no threshold was exceeded.' },
+          { key: 'warning', text: 'The alert level was reached, but the flood level was not.' },
+          { key: 'flooded', text: 'The flood threshold was exceeded.' },
+          { key: 'extreme_flooding', text: 'The severe threshold was exceeded.' },
+          { key: 'no_data', text: 'No valid reading was available for that station on that day.' },
+        ],
+        note: 'No data does not mean the station is absent. It only means there was no valid reading on the selected day.',
+      },
+      {
+        eyebrow: 'Filter and explore',
+        title: 'Use search, filters, and map together',
+        text: 'You can filter by state, basin, biome, hydraulic evidence, and other fields to narrow the list and inspect the spatial picture for that day.',
+        visual: 'image',
+        image: GUIDE_IMAGES.en.filtersMap,
+        imageAlt: 'LIMIAR search and filter panel next to the national map.',
+        visualCaption: 'The list and the map work together to highlight only the subset you need.',
+        highlights: [
+          { title: 'Quick search', text: 'Search by code, name, municipality, or basin.' },
+          { title: 'Thematic filters', text: 'Refine by status, threshold type, state, basin, and biome.' },
+          { title: 'Day snapshot', text: 'The map shows the selected day, not a live warning feed.' },
+        ],
+      },
+      {
+        eyebrow: 'Open a station',
+        title: 'Inspect time series, evidence, and exports',
+        text: 'When you click a station, the panel shows the main time series, cross sections, rating-curve context, reconstructed events, and export options.',
+        visual: 'image',
+        image: GUIDE_IMAGES.en.stationDetail,
+        imageAlt: 'LIMIAR station panel with status, metadata, and charts.',
+        visualCaption: 'Each station combines the daily record, hydraulic evidence, and outputs you can share.',
+        highlights: [
+          { title: 'Time series', text: 'See the daily record with thresholds overlaid.' },
+          { title: 'Hydraulic evidence', text: 'Open cross sections, rating curves, and threshold evolution.' },
+          { title: 'Exports', text: 'Download CSVs or generate a DOCX station brief.' },
+        ],
+        note: 'LIMIAR is a historical atlas for analysis and communication. It is not an operational real-time warning system.',
+      },
+    ],
+  },
+};
+
 const UNCERTAINTY_TEXT = {
   low: { pt: 'Baixa', en: 'Low' },
   medium: { pt: 'Média', en: 'Medium' },
@@ -731,7 +885,7 @@ const MONTH_LABELS = {
 const DEFAULT_STATION_CODE = '83250000';
 
 const state = {
-  lang: 'pt',
+  lang: 'en',
   manifest: null,
   stations: [],
   stationByCode: new Map(),
@@ -745,8 +899,6 @@ const state = {
   stationCache: new Map(),
   charts: {},
   markersLayer: null,
-  markerBounds: null,
-  markerRenderer: null,
   currentRange: '90',
   basemap: 'osm',
   baseLayers: {},
@@ -755,21 +907,16 @@ const state = {
     summary: true,
     legend: true,
   },
-  activeMobileView: 'search',
-  mapInitialized: false,
-  mobileStationListPageSize: 60,
-  mobileStationListVisibleCount: 60,
-  mobileStationChartsDirty: false,
+  guide: {
+    activeStep: 0,
+    returnFocus: null,
+  },
   dateScrubberTimer: null,
   dateStepHoldTimer: null,
   dateStepRepeatTimer: null,
   dateStepSuppressClick: false,
   dateStepBusy: false,
-  resizeTimer: null,
 };
-
-const MOBILE_BREAKPOINT = 920;
-const MOBILE_STATION_PAGE_SIZE = 60;
 
 const BASEMAP_DEFS = {
   osm: {
@@ -784,7 +931,10 @@ const BASEMAP_DEFS = {
   },
 };
 
-let map = null;
+const map = L.map('map', {
+  preferCanvas: true,
+  zoomControl: true,
+}).setView([-14.5, -52.5], 4);
 
 Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
   state.baseLayers[key] = L.tileLayer(config.url, {
@@ -792,6 +942,7 @@ Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
     maxZoom: config.maxZoom,
   });
 });
+state.baseLayers[state.basemap].addTo(map);
 
 function byId(id) {
   return document.getElementById(id);
@@ -805,42 +956,12 @@ function nestedText(group, key) {
   return TEXT[state.lang][group][key];
 }
 
+function guideText() {
+  return GUIDE_CONTENT[state.lang];
+}
+
 function qaPanelPartLabel(key) {
   return TEXT[state.lang].qaPanelParts?.[key] || key;
-}
-
-function isMobileLayout() {
-  return window.innerWidth <= MOBILE_BREAKPOINT;
-}
-
-function mobileViewClass(view) {
-  return `mobile-view-${view}`;
-}
-
-function syncLayoutMetrics() {
-  const topbar = document.querySelector('.topbar');
-  if (topbar) {
-    document.documentElement.style.setProperty('--header-height', `${Math.ceil(topbar.offsetHeight)}px`);
-  }
-  const nav = byId('mobileNav');
-  const navHeight = isMobileLayout() && nav ? Math.ceil(nav.offsetHeight || 0) : 0;
-  document.documentElement.style.setProperty('--mobile-nav-height', `${navHeight}px`);
-}
-
-function ensureMap() {
-  if (map) return map;
-  map = L.map('map', {
-    zoomControl: true,
-  }).setView([-14.5, -52.5], 4);
-  state.baseLayers[state.basemap].addTo(map);
-  state.markerRenderer = L.svg();
-  state.markerRenderer.addTo(map);
-  state.mapInitialized = true;
-  renderMap();
-  window.setTimeout(() => {
-    map.invalidateSize(false);
-  }, 80);
-  return map;
 }
 
 function isFiniteNumber(value) {
@@ -951,10 +1072,6 @@ function openOverlay(id) {
   const node = byId(id);
   if (!node) return;
   node.hidden = false;
-  if (id === 'actionsOverlay') {
-    const mobileActionsButton = byId('mobileActionsButton');
-    if (mobileActionsButton) mobileActionsButton.setAttribute('aria-expanded', 'true');
-  }
   document.body.classList.add('modal-open');
 }
 
@@ -962,164 +1079,260 @@ function closeOverlay(id) {
   const node = byId(id);
   if (!node) return;
   node.hidden = true;
-  if (id === 'actionsOverlay') {
-    const mobileActionsButton = byId('mobileActionsButton');
-    if (mobileActionsButton) mobileActionsButton.setAttribute('aria-expanded', 'false');
-  }
   if (!Array.from(document.querySelectorAll('.overlay')).some((overlay) => !overlay.hidden)) {
     document.body.classList.remove('modal-open');
   }
 }
 
-function setActivePanel(panelId) {
-  document.querySelectorAll('.tabbar button').forEach((node) => node.classList.toggle('active', node.dataset.panel === panelId));
-  document.querySelectorAll('.panel-view').forEach((panel) => panel.classList.toggle('active', panel.id === panelId));
+function guideIsOpen() {
+  const overlay = byId('theoryOverlay');
+  return Boolean(overlay && !overlay.hidden);
 }
 
-function syncMobileNavButtons() {
-  document.querySelectorAll('[data-mobile-view]').forEach((button) => {
-    button.classList.toggle('active', button.dataset.mobileView === state.activeMobileView);
+function setGuideSeen() {
+  try {
+    window.localStorage.setItem('limiarGuideSeen', GUIDE_SEEN_VERSION);
+  } catch (_error) {
+    // Ignore storage restrictions.
+  }
+}
+
+function guideAlreadySeen() {
+  try {
+    return window.localStorage.getItem('limiarGuideSeen') === GUIDE_SEEN_VERSION;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function focusGuideTitle() {
+  window.requestAnimationFrame(() => {
+    byId('guideTitle')?.focus();
   });
 }
 
-function renderSelectedStationHeavy(stationData) {
-  renderTimeseriesChart(stationData);
-  renderCrossSectionChart(stationData);
-  renderDynamicDailyChart(stationData);
-  renderRatingCurveChart(stationData);
-  renderEvidenceChart(stationData);
-  renderEventSummary(stationData);
-  renderSeasonality(stationData);
-  renderEventsTable(stationData);
-  renderQaSection(stationData);
+function openGuide(step = 0, returnFocus = byId('theoryButton')) {
+  closeOverlay('layersOverlay');
+  closeOverlay('imageOverlay');
+  const guide = guideText();
+  const lastStep = Math.max(guide.steps.length - 1, 0);
+  state.guide.activeStep = Math.max(0, Math.min(step, lastStep));
+  state.guide.returnFocus = returnFocus || document.activeElement;
+  renderTheoryModal();
+  openOverlay('theoryOverlay');
+  focusGuideTitle();
 }
 
-function maybeRenderDeferredStationCharts() {
-  if (!state.selectedData) return;
-  if (isMobileLayout() && state.activeMobileView !== 'station') return;
-  if (!state.mobileStationChartsDirty && state.charts.timeseriesChart) return;
-  renderSelectedStationHeavy(state.selectedData);
-  state.mobileStationChartsDirty = false;
+function closeGuide(markSeen = true) {
+  if (markSeen) setGuideSeen();
+  closeOverlay('theoryOverlay');
+  const target = state.guide.returnFocus;
+  state.guide.returnFocus = null;
+  if (target && typeof target.focus === 'function') {
+    window.requestAnimationFrame(() => target.focus());
+  }
 }
 
-function renderSelectedStation(stationData, options = {}) {
-  const { deferHeavy = isMobileLayout() && state.activeMobileView !== 'station' } = options;
-  renderStatusCard(stationData);
-  renderMetadata(stationData);
-  if (deferHeavy) {
-    state.mobileStationChartsDirty = true;
+function setGuideStep(step) {
+  const guide = guideText();
+  const lastStep = Math.max(guide.steps.length - 1, 0);
+  state.guide.activeStep = Math.max(0, Math.min(step, lastStep));
+  renderTheoryModal();
+  focusGuideTitle();
+}
+
+function moveGuideStep(delta) {
+  setGuideStep(state.guide.activeStep + delta);
+}
+
+function activateGuidePrimaryAction() {
+  const guide = guideText();
+  if (state.guide.activeStep >= guide.steps.length - 1) {
+    closeGuide(true);
     return;
   }
-  renderSelectedStationHeavy(stationData);
-  state.mobileStationChartsDirty = false;
+  moveGuideStep(1);
 }
 
-function setMobileView(view) {
-  state.activeMobileView = view;
-  document.body.classList.remove(
-    mobileViewClass('search'),
-    mobileViewClass('map'),
-    mobileViewClass('station'),
-    mobileViewClass('dataset'),
-  );
-  if (isMobileLayout()) {
-    document.body.classList.add(mobileViewClass(view));
-  }
-  if (view === 'station') {
-    setActivePanel('stationPanel');
-    maybeRenderDeferredStationCharts();
-  }
-  if (view === 'dataset') {
-    setActivePanel('datasetPanel');
-    renderDatasetMetrics();
-  }
-  if (view === 'map') {
-    ensureMap();
-    renderMap();
-    window.setTimeout(() => {
-      if (map) map.invalidateSize(false);
-    }, 80);
-  }
-  syncMobileNavButtons();
-  syncLayoutMetrics();
+function guideFocusableElements() {
+  const overlay = byId('theoryOverlay');
+  if (!overlay) return [];
+  return Array.from(
+    overlay.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+  ).filter((node) => !node.hidden && node.offsetParent !== null);
 }
 
-function syncResponsiveLayout() {
-  const mobile = isMobileLayout();
-  document.body.classList.toggle('mobile-layout', mobile);
-  if (mobile) {
-    if (!['search', 'map', 'station', 'dataset'].includes(state.activeMobileView)) {
-      state.activeMobileView = state.selectedCode ? 'station' : 'search';
-    }
-    setMobileView(state.activeMobileView);
+function trapGuideFocus(event) {
+  const focusables = guideFocusableElements();
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function shouldAutoOpenGuide(urlState) {
+  if (urlState.guide === '1') return true;
+  if (urlState.guide === '0') return false;
+  if (urlState.station) return false;
+  return !guideAlreadySeen();
+}
+
+function renderGuideHighlights(step) {
+  const highlights = byId('guideHighlights');
+  if (!highlights) return;
+  if (!step.highlights?.length) {
+    highlights.innerHTML = '';
+    highlights.hidden = true;
+    return;
+  }
+  highlights.hidden = false;
+  highlights.innerHTML = step.highlights.map((item) => `
+    <article class="guide-highlight-card">
+      <h3>${item.title}</h3>
+      <p>${item.text}</p>
+    </article>
+  `).join('');
+}
+
+function renderGuideClasses(step) {
+  const classesNode = byId('guideClasses');
+  if (!classesNode) return;
+  if (!step.classes?.length) {
+    classesNode.hidden = true;
+    classesNode.innerHTML = '';
+    return;
+  }
+  classesNode.hidden = false;
+  classesNode.innerHTML = step.classes.map((item) => `
+    <article class="guide-class-card">
+      <div class="guide-class-head">
+        <span class="guide-class-dot" style="background:${STATUS_COLORS[item.key] || STATUS_COLORS.no_data}"></span>
+        <strong>${statusLabel(item.key)}</strong>
+      </div>
+      <p>${item.text}</p>
+    </article>
+  `).join('');
+}
+
+function renderGuideVisual(step) {
+  const card = byId('guideVisualCard');
+  const lockup = byId('guideLockup');
+  const image = byId('guideVisualImage');
+  const caption = byId('guideVisualCaption');
+  if (!card || !lockup || !image || !caption) return;
+  const isLockup = step.visual === 'lockup';
+  card.dataset.mode = isLockup ? 'lockup' : 'image';
+  lockup.hidden = !isLockup;
+  image.hidden = isLockup;
+  if (!isLockup) {
+    image.src = step.image;
+    image.alt = step.imageAlt || '';
   } else {
-    document.body.classList.remove(
-      mobileViewClass('search'),
-      mobileViewClass('map'),
-      mobileViewClass('station'),
-      mobileViewClass('dataset'),
-    );
-    syncMobileNavButtons();
-    ensureMap();
-    renderMap();
-    window.setTimeout(() => {
-      if (map) map.invalidateSize(false);
-    }, 80);
-    maybeRenderDeferredStationCharts();
-    syncLayoutMetrics();
+    image.removeAttribute('src');
+    image.alt = '';
   }
+  caption.textContent = step.visualCaption || '';
 }
 
 function renderTheoryModal() {
-  const theory = TEXT[state.lang].theory;
-  const body = byId('theoryBody');
-  if (!body) return;
-  byId('theoryEyebrow').textContent = theory.eyebrow;
-  byId('theoryTitle').textContent = theory.title;
-  body.innerHTML = `
-    <p class="theory-lead">${theory.intro}</p>
-    <div class="theory-grid">
-      ${theory.steps.map((step, index) => `
-        <article class="theory-step">
-          <span class="theory-step-number">${index + 1}</span>
-          <div>
-            <h3>${step.title}</h3>
-            <p>${step.text}</p>
-          </div>
-        </article>
-      `).join('')}
-    </div>
-    <section class="theory-status-card">
-      <h3>${theory.classesTitle}</h3>
-      <ul class="theory-status-list">
-        ${['normal', 'warning', 'flooded', 'extreme_flooding'].map((key) => `
-          <li>
-            <span class="theory-status-dot" style="background:${STATUS_COLORS[key]}"></span>
-            <div>
-              <strong>${statusLabel(key)}</strong>
-              <span>${theory.classDescriptions[key]}</span>
-            </div>
-          </li>
-        `).join('')}
-      </ul>
-      <p>${theory.classesText}</p>
-    </section>
-    <section class="theory-note">
-      <h3>${theory.caveatTitle}</h3>
-      <p>${theory.caveatText}</p>
-    </section>
-  `;
+  const guide = guideText();
+  const step = guide.steps[state.guide.activeStep] || guide.steps[0];
+  const badge = byId('guideBadge');
+  const progress = byId('guideProgress');
+  const eyebrow = byId('guideEyebrow');
+  const title = byId('guideTitle');
+  const textNode = byId('guideText');
+  const note = byId('guideNote');
+  const prev = byId('guidePrevButton');
+  const next = byId('guideNextButton');
+  const skip = byId('guideSkipButton');
+  const close = byId('closeTheoryButton');
+  if (!badge || !progress || !eyebrow || !title || !textNode || !note || !prev || !next || !skip || !close) return;
+
+  badge.textContent = guide.badge;
+  progress.setAttribute('aria-label', guide.progressLabel);
+  progress.innerHTML = guide.steps.map((entry, index) => `
+    <button
+      type="button"
+      class="guide-dot ${index === state.guide.activeStep ? 'active' : ''}"
+      data-guide-step="${index}"
+      role="tab"
+      aria-selected="${index === state.guide.activeStep ? 'true' : 'false'}"
+      aria-label="${guide.progressLabel} ${index + 1}: ${entry.title}"
+    >
+      <span class="sr-only">${entry.title}</span>
+    </button>
+  `).join('');
+  progress.querySelectorAll('[data-guide-step]').forEach((button) => {
+    button.addEventListener('click', () => setGuideStep(Number(button.dataset.guideStep)));
+  });
+
+  eyebrow.textContent = step.eyebrow;
+  title.textContent = step.title;
+  textNode.textContent = step.text;
+
+  renderGuideHighlights(step);
+  renderGuideClasses(step);
+  renderGuideVisual(step);
+
+  if (step.note) {
+    note.hidden = false;
+    note.textContent = step.note;
+  } else {
+    note.hidden = true;
+    note.textContent = '';
+  }
+
+  prev.textContent = guide.back;
+  prev.disabled = state.guide.activeStep === 0;
+  skip.textContent = guide.skip;
+  next.textContent = state.guide.activeStep === guide.steps.length - 1 ? guide.finish : guide.next;
+  close.setAttribute('aria-label', guide.close);
+}
+
+function handleGuideKeydown(event) {
+  if (!guideIsOpen()) return false;
+  if (event.key === 'Tab') {
+    trapGuideFocus(event);
+    return false;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeGuide(true);
+    return true;
+  }
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    activateGuidePrimaryAction();
+    return true;
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    moveGuideStep(-1);
+    return true;
+  }
+  if (event.key === 'Enter') {
+    const activeTag = document.activeElement?.tagName;
+    if (!['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(activeTag)) {
+      event.preventDefault();
+      activateGuidePrimaryAction();
+      return true;
+    }
+  }
+  return false;
 }
 
 function setBasemap(key) {
   if (!state.baseLayers[key] || state.basemap === key) return;
-  if (map) {
-    map.removeLayer(state.baseLayers[state.basemap]);
-  }
+  map.removeLayer(state.baseLayers[state.basemap]);
   state.basemap = key;
-  if (map) {
-    state.baseLayers[key].addTo(map);
-  }
+  state.baseLayers[key].addTo(map);
 }
 
 function applyMapVisibility() {
@@ -1127,7 +1340,7 @@ function applyMapVisibility() {
   const legendCard = byId('legendCard');
   if (selectedCard) selectedCard.hidden = !state.mapVisibility.summary;
   if (legendCard) legendCard.hidden = !state.mapVisibility.legend;
-  if (state.mapInitialized) renderMap();
+  renderMap();
 }
 
 function renderLayersModal() {
@@ -1199,7 +1412,7 @@ function showFatalState(message = text('fatalMessage'), showCommand = false) {
   if (!card || !title || !body || !command) return;
   title.textContent = text('fatalTitle');
   body.textContent = message;
-  command.textContent = `${text('fatalCommandLabel')}\ncd docs\npython3 -m http.server 8000`;
+  command.textContent = `${text('fatalCommandLabel')}\ncd github/LIMIAR\npython3 -m http.server 8000`;
   command.hidden = !showCommand;
   card.hidden = false;
 }
@@ -1752,7 +1965,6 @@ function getStatusInfo(stationCode, dateString) {
 function applyStaticTranslations() {
   const keys = [
     'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton',
-    'mobileActionsButton', 'mobileActionsEyebrow', 'mobileActionsTitle', 'mobileNavSearchButton', 'mobileNavMapButton', 'mobileNavStationButton', 'mobileNavDatasetButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
@@ -1767,19 +1979,6 @@ function applyStaticTranslations() {
     const node = byId(id);
     if (node) node.textContent = text(id);
   });
-  const mobileActionMap = [
-    ['mobileTheoryButton', 'theoryButton'],
-    ['mobileLayersButton', 'layersButton'],
-    ['mobileFitMapButton', 'fitMapButton'],
-    ['mobileExportCsvButton', 'exportCsvButton'],
-    ['mobileShareButton', 'shareButton'],
-  ];
-  mobileActionMap.forEach(([id, key]) => {
-    const node = byId(id);
-    if (node) node.textContent = text(key);
-  });
-  const mobileNav = byId('mobileNav');
-  if (mobileNav) mobileNav.setAttribute('aria-label', text('mobileNavAria'));
   byId('stationSearch').placeholder = text('searchPlaceholder');
   const prevDateButton = byId('prevDateButton');
   const nextDateButton = byId('nextDateButton');
@@ -1796,6 +1995,8 @@ function applyStaticTranslations() {
     dateScrubber.setAttribute('aria-label', text('dateScrubberLabel'));
     dateScrubber.setAttribute('title', text('dateScrubberLabel'));
   }
+  const languageSwitch = document.querySelector('.language-switch');
+  if (languageSwitch) languageSwitch.setAttribute('aria-label', text('languageSwitchLabel'));
   const fullRangeButton = document.querySelector('.range-button[data-range="full"]');
   if (fullRangeButton) fullRangeButton.textContent = text('fullRecordLabel');
   const fatalTitle = byId('fatalTitle');
@@ -1824,8 +2025,6 @@ function applyStaticTranslations() {
   if (imageClose) imageClose.setAttribute('aria-label', text('closeLabel'));
   const layersClose = byId('closeLayersButton');
   if (layersClose) layersClose.setAttribute('aria-label', text('closeLabel'));
-  const actionsClose = byId('closeActionsButton');
-  if (actionsClose) actionsClose.setAttribute('aria-label', text('closeLabel'));
   renderTheoryModal();
   renderLayersModal();
   document.title = text('pageTitle');
@@ -1834,7 +2033,12 @@ function applyStaticTranslations() {
 
 function updateLanguageButtons() {
   document.querySelectorAll('.lang-button').forEach((button) => {
-    button.classList.toggle('active', button.dataset.lang === state.lang);
+    const isActive = button.dataset.lang === state.lang;
+    const labelKey = button.dataset.lang === 'pt' ? 'languageLabelPt' : 'languageLabelEn';
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    button.setAttribute('aria-label', text(labelKey));
+    button.setAttribute('title', text(labelKey));
   });
 }
 
@@ -1955,8 +2159,8 @@ function stationSearchText(station) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-function markerRadius(station) {
-  return 6.5;
+function markerRadius(status) {
+  return MARKER_RADIUS_BASE * (STATUS_RADIUS_MULTIPLIER[status] || 1);
 }
 
 function renderLegend() {
@@ -1965,7 +2169,8 @@ function renderLegend() {
   ['normal', 'warning', 'flooded', 'extreme_flooding', 'no_data'].forEach((key) => {
     const row = document.createElement('div');
     row.className = 'legend-row';
-    row.innerHTML = `<span class="legend-dot" style="background:${STATUS_COLORS[key]}"></span><span>${nestedText('legend', key)}</span>`;
+    const diameter = markerRadius(key) * 2;
+    row.innerHTML = `<span class="legend-dot" style="background:${STATUS_COLORS[key]};width:${diameter}px;height:${diameter}px"></span><span>${nestedText('legend', key)}</span>`;
     legend.appendChild(row);
   });
   const note = document.createElement('p');
@@ -2006,9 +2211,6 @@ function applyFilters() {
     if (filters.biome !== 'all' && station.biome !== filters.biome) return false;
     return true;
   });
-  if (isMobileLayout()) {
-    state.mobileStationListVisibleCount = MOBILE_STATION_PAGE_SIZE;
-  }
   renderStationList();
   renderMap();
   renderDatasetMetrics();
@@ -2016,12 +2218,8 @@ function applyFilters() {
 
 function renderStationList() {
   const list = byId('stationList');
-  const loadMoreButton = byId('stationLoadMoreButton');
   list.innerHTML = '';
-  const visibleStations = isMobileLayout()
-    ? state.filteredStations.slice(0, state.mobileStationListVisibleCount)
-    : state.filteredStations;
-  visibleStations.forEach((station) => {
+  state.filteredStations.forEach((station) => {
     const info = getStatusInfo(station.station_code, state.selectedDate);
     const basisKey = resolvedBasisKey(info.basis, station.threshold_basis);
     const button = document.createElement('button');
@@ -2040,25 +2238,11 @@ function renderStationList() {
     button.addEventListener('click', () => selectStation(station.station_code));
     list.appendChild(button);
   });
-  const renderedCount = visibleStations.length;
-  byId('visibleCount').textContent = isMobileLayout()
-    ? `${renderedCount} / ${state.filteredStations.length} ${text('visibleStations')}`
-    : `${state.filteredStations.length} ${text('visibleStations')}`;
+  byId('visibleCount').textContent = `${state.filteredStations.length} ${text('visibleStations')}`;
   byId('listCount').textContent = formatNumber(state.filteredStations.length);
-  if (loadMoreButton) {
-    const remaining = Math.max(0, state.filteredStations.length - renderedCount);
-    if (isMobileLayout() && remaining > 0) {
-      const nextCount = Math.min(state.mobileStationListPageSize, remaining);
-      loadMoreButton.textContent = `${text('loadMoreStations')} (${nextCount})`;
-      loadMoreButton.hidden = false;
-    } else {
-      loadMoreButton.hidden = true;
-    }
-  }
 }
 
 function renderMap() {
-  if (!state.mapInitialized || !map) return;
   if (state.markersLayer) state.markersLayer.remove();
   state.markersLayer = L.layerGroup();
   if (!state.mapVisibility.stations) {
@@ -2071,8 +2255,7 @@ function renderMap() {
     const info = getStatusInfo(station.station_code, state.selectedDate);
     const basisKey = resolvedBasisKey(info.basis, station.threshold_basis);
     const marker = L.circleMarker([station.lat, station.lon], {
-      radius: markerRadius(station),
-      renderer: state.markerRenderer || undefined,
+      radius: markerRadius(info.status),
       color: '#fffdf6',
       weight: 1.3,
       fillColor: STATUS_COLORS[info.status],
@@ -2091,13 +2274,6 @@ function renderMap() {
   });
   state.markersLayer.addTo(map);
   state.markerBounds = markers.length ? L.featureGroup(markers).getBounds() : null;
-  window.requestAnimationFrame(() => {
-    if (!map) return;
-    map.invalidateSize(false);
-    state.markersLayer?.eachLayer((layer) => {
-      if (typeof layer.redraw === 'function') layer.redraw();
-    });
-  });
 }
 
 function renderGlobalStats() {
@@ -2171,7 +2347,6 @@ function renderMetricArticles(container, items) {
 }
 
 function renderDatasetMetrics() {
-  if (!state.manifest) return;
   const allStations = state.stations || [];
   const totalCount = allStations.length || Number(state.manifest?.published_station_count || 0);
   const hydraulicCount = allStations.filter((station) => station.threshold_basis === 'hydraulic').length;
@@ -3264,20 +3439,12 @@ function renderSeasonality(stationData) {
 
 function renderEventsTable(stationData) {
   const body = byId('eventTableBody');
-  const mobileList = byId('eventMobileList');
   body.innerHTML = '';
-  if (mobileList) mobileList.innerHTML = '';
   const events = normalizedEventRows(stationData);
   if (!events.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td colspan="5">-</td>';
     body.appendChild(tr);
-    if (mobileList) {
-      const empty = document.createElement('div');
-      empty.className = 'mobile-event-item';
-      empty.textContent = '-';
-      mobileList.appendChild(empty);
-    }
     return;
   }
   events.forEach((event) => {
@@ -3294,37 +3461,6 @@ function renderEventsTable(stationData) {
       <td>${classText}</td>
     `;
     body.appendChild(tr);
-    if (mobileList) {
-      const card = document.createElement('article');
-      card.className = 'mobile-event-item';
-      card.innerHTML = `
-        <div class="mobile-event-dates">
-          <div class="mobile-event-block">
-            <span>${text('thStartDate')}</span>
-            <strong>${formatShortDate(event.event_start)}</strong>
-          </div>
-          <div class="mobile-event-block">
-            <span>${text('thPeakDate')}</span>
-            <strong>${formatShortDate(event.peak_date)}</strong>
-          </div>
-        </div>
-        <div class="mobile-event-kpis">
-          <div class="mobile-event-block">
-            <span>${text('thDuration')}</span>
-            <strong>${formatDuration(event.duration_days)}</strong>
-          </div>
-          <div class="mobile-event-block">
-            <span>${text('thPeak')}</span>
-            <strong>${peakValue}</strong>
-          </div>
-          <div class="mobile-event-block">
-            <span>${text('thClass')}</span>
-            <strong>${classText}</strong>
-          </div>
-        </div>
-      `;
-      mobileList.appendChild(card);
-    }
   });
 }
 
@@ -3404,7 +3540,6 @@ function renderQaSection(stationData) {
 }
 
 function renderEmptySelection() {
-  state.mobileStationChartsDirty = false;
   byId('selectedStatusTitle').textContent = text('selectedStatusTitle');
   byId('selectedStatusSubtitle').textContent = text('selectedStatusSubtitle');
   byId('selectedMetricStatus').textContent = '-';
@@ -3416,7 +3551,6 @@ function renderEmptySelection() {
   byId('qaFlags').innerHTML = '';
   byId('eventMetrics').innerHTML = '';
   byId('eventTableBody').innerHTML = '';
-  byId('eventMobileList').innerHTML = '';
   byId('crossSectionChart').hidden = true;
   byId('crossSectionEmpty').hidden = true;
   destroyChart('crossSectionChart');
@@ -3446,18 +3580,24 @@ function renderEmptySelection() {
 
 async function selectStation(stationCode) {
   state.selectedCode = stationCode;
-  if (isMobileLayout()) {
-    setMobileView('station');
-  }
   renderStationList();
   const station = state.stationByCode.get(stationCode);
   if (!station) return;
   updateUrl();
   showToast(TEXT[state.lang].toasts.loading, 900);
   const data = await loadStationData(stationCode);
-  if (state.selectedCode !== stationCode) return;
   state.selectedData = data;
-  renderSelectedStation(data);
+  renderStatusCard(data);
+  renderMetadata(data);
+  renderTimeseriesChart(data);
+  renderCrossSectionChart(data);
+  renderDynamicDailyChart(data);
+  renderRatingCurveChart(data);
+  renderEvidenceChart(data);
+  renderEventSummary(data);
+  renderSeasonality(data);
+  renderEventsTable(data);
+  renderQaSection(data);
 }
 
 function updateUrl() {
@@ -3469,8 +3609,6 @@ function updateUrl() {
 }
 
 function fitMapToFiltered() {
-  ensureMap();
-  renderMap();
   if (state.markerBounds) {
     map.fitBounds(state.markerBounds.pad(0.15));
   }
@@ -3482,6 +3620,7 @@ function parseUrlState() {
     date: params.get('date'),
     station: params.get('station'),
     lang: params.get('lang'),
+    guide: params.get('guide'),
   };
 }
 
@@ -3499,12 +3638,7 @@ async function setSelectedDate(dateString, preserveSelection = true) {
   if (preserveSelection && state.selectedCode) {
     if (state.selectedData) {
       renderStatusCard(state.selectedData);
-      if (!isMobileLayout() || state.activeMobileView === 'station') {
-        renderTimeseriesChart(state.selectedData);
-        state.mobileStationChartsDirty = false;
-      } else {
-        state.mobileStationChartsDirty = true;
-      }
+      renderTimeseriesChart(state.selectedData);
     } else {
       await selectStation(state.selectedCode);
     }
@@ -4480,13 +4614,6 @@ function wireEvents() {
     byId(id).addEventListener('input', applyFilters);
     byId(id).addEventListener('change', applyFilters);
   });
-  const loadMoreButton = byId('stationLoadMoreButton');
-  if (loadMoreButton) {
-    loadMoreButton.addEventListener('click', () => {
-      state.mobileStationListVisibleCount += state.mobileStationListPageSize;
-      renderStationList();
-    });
-  }
   byId('datePicker').addEventListener('change', async (event) => {
     if (event.target.value) await setSelectedDate(event.target.value);
   });
@@ -4514,51 +4641,17 @@ function wireEvents() {
   const nextDateButton = byId('nextDateButton');
   bindDateStepButton(prevDateButton, -1);
   bindDateStepButton(nextDateButton, 1);
-
-  const openTheory = () => {
-    closeOverlay('actionsOverlay');
-    openOverlay('theoryOverlay');
-  };
-  const openLayers = () => {
-    closeOverlay('actionsOverlay');
+  byId('theoryButton').addEventListener('click', (event) => openGuide(0, event.currentTarget));
+  byId('layersButton').addEventListener('click', () => {
     renderLayersModal();
     openOverlay('layersOverlay');
-  };
-  const fitMapAction = () => {
-    if (isMobileLayout()) setMobileView('map');
-    closeOverlay('actionsOverlay');
-    fitMapToFiltered();
-  };
-  const exportCsvAction = () => {
-    closeOverlay('actionsOverlay');
-    exportFilteredCsv();
-  };
-  const shareAction = async () => {
+  });
+  byId('fitMapButton').addEventListener('click', fitMapToFiltered);
+  byId('exportCsvButton').addEventListener('click', exportFilteredCsv);
+  byId('shareButton').addEventListener('click', async () => {
     await navigator.clipboard.writeText(window.location.href);
     showToast(TEXT[state.lang].toasts.copied);
-    closeOverlay('actionsOverlay');
-  };
-  [
-    ['theoryButton', openTheory],
-    ['mobileTheoryButton', openTheory],
-    ['layersButton', openLayers],
-    ['mobileLayersButton', openLayers],
-    ['fitMapButton', fitMapAction],
-    ['mobileFitMapButton', fitMapAction],
-    ['exportCsvButton', exportCsvAction],
-    ['mobileExportCsvButton', exportCsvAction],
-  ].forEach(([id, handler]) => {
-    const node = byId(id);
-    if (node) node.addEventListener('click', handler);
   });
-  ['shareButton', 'mobileShareButton'].forEach((id) => {
-    const node = byId(id);
-    if (node) node.addEventListener('click', shareAction);
-  });
-  const mobileActionsButton = byId('mobileActionsButton');
-  if (mobileActionsButton) {
-    mobileActionsButton.addEventListener('click', () => openOverlay('actionsOverlay'));
-  }
   byId('exportStationDataButton').addEventListener('click', exportStationDataPackage);
   Object.keys(STATION_CSV_EXPORTS).forEach((id) => {
     const button = byId(id);
@@ -4568,19 +4661,26 @@ function wireEvents() {
   byId('openQaImageButton').addEventListener('click', () => {
     if (!byId('qaImage').hidden) openOverlay('imageOverlay');
   });
-  byId('closeTheoryButton').addEventListener('click', () => closeOverlay('theoryOverlay'));
+  byId('closeTheoryButton').addEventListener('click', () => closeGuide(true));
+  byId('guidePrevButton').addEventListener('click', () => moveGuideStep(-1));
+  byId('guideNextButton').addEventListener('click', activateGuidePrimaryAction);
+  byId('guideSkipButton').addEventListener('click', () => closeGuide(true));
   byId('closeLayersButton').addEventListener('click', () => closeOverlay('layersOverlay'));
   byId('closeImageButton').addEventListener('click', () => closeOverlay('imageOverlay'));
-  byId('closeActionsButton').addEventListener('click', () => closeOverlay('actionsOverlay'));
   document.querySelectorAll('[data-overlay-close]').forEach((button) => {
-    button.addEventListener('click', () => closeOverlay(button.dataset.overlayClose));
+    button.addEventListener('click', () => {
+      if (button.dataset.overlayClose === 'theoryOverlay') {
+        closeGuide(true);
+      } else {
+        closeOverlay(button.dataset.overlayClose);
+      }
+    });
   });
   window.addEventListener('keydown', (event) => {
+    if (handleGuideKeydown(event)) return;
     if (event.key !== 'Escape') return;
-    closeOverlay('theoryOverlay');
     closeOverlay('layersOverlay');
     closeOverlay('imageOverlay');
-    closeOverlay('actionsOverlay');
   });
   document.querySelectorAll('.lang-button').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -4592,40 +4692,35 @@ function wireEvents() {
       renderGlobalStats();
       applyFilters();
       if (state.selectedData) {
-        renderSelectedStation(state.selectedData);
+        renderStatusCard(state.selectedData);
+        renderMetadata(state.selectedData);
+        renderTimeseriesChart(state.selectedData);
+        renderCrossSectionChart(state.selectedData);
+        renderDynamicDailyChart(state.selectedData);
+        renderRatingCurveChart(state.selectedData);
+        renderEvidenceChart(state.selectedData);
+        renderEventSummary(state.selectedData);
+        renderSeasonality(state.selectedData);
+        renderEventsTable(state.selectedData);
+        renderQaSection(state.selectedData);
       } else {
         renderEmptySelection();
       }
       updateUrl();
-      syncLayoutMetrics();
     });
   });
   document.querySelectorAll('.range-button').forEach((button) => {
     button.addEventListener('click', () => {
       state.currentRange = button.dataset.range;
       document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node === button));
-      if (!state.selectedData) return;
-      if (!isMobileLayout() || state.activeMobileView === 'station') {
-        renderTimeseriesChart(state.selectedData);
-        state.mobileStationChartsDirty = false;
-      } else {
-        state.mobileStationChartsDirty = true;
-      }
+      if (state.selectedData) renderTimeseriesChart(state.selectedData);
     });
   });
   document.querySelectorAll('.tabbar button').forEach((button) => {
     button.addEventListener('click', () => {
-      setActivePanel(button.dataset.panel);
+      document.querySelectorAll('.tabbar button').forEach((node) => node.classList.toggle('active', node === button));
+      document.querySelectorAll('.panel-view').forEach((panel) => panel.classList.toggle('active', panel.id === button.dataset.panel));
     });
-  });
-  document.querySelectorAll('[data-mobile-view]').forEach((button) => {
-    button.addEventListener('click', () => setMobileView(button.dataset.mobileView));
-  });
-  window.addEventListener('resize', () => {
-    if (state.resizeTimer) window.clearTimeout(state.resizeTimer);
-    state.resizeTimer = window.setTimeout(() => {
-      syncResponsiveLayout();
-    }, 120);
   });
 }
 
@@ -4633,8 +4728,6 @@ async function boot() {
   ensureDateNavigator();
   applyStaticTranslations();
   updateLanguageButtons();
-  syncLayoutMetrics();
-  syncResponsiveLayout();
   renderLegend();
   applyMapVisibility();
   renderEmptySelection();
@@ -4655,13 +4748,11 @@ async function boot() {
   renderGlobalStats();
 
   const urlState = parseUrlState();
-  state.activeMobileView = urlState.station ? 'station' : 'search';
   if (urlState.lang && TEXT[urlState.lang]) {
     state.lang = urlState.lang;
     applyStaticTranslations();
     updateLanguageButtons();
   }
-  syncResponsiveLayout();
   populateFilters();
   byId('qaFilter').value = 'screening_ok';
 
@@ -4678,13 +4769,16 @@ async function boot() {
   const defaultStation = state.stationByCode.has(DEFAULT_STATION_CODE)
     ? DEFAULT_STATION_CODE
     : (state.filteredStations[0]?.station_code || state.stations[0]?.station_code);
-  const initialStation = urlState.station || (!isMobileLayout() ? defaultStation : null);
+  const initialStation = urlState.station || defaultStation;
   if (initialStation) {
     await selectStation(initialStation);
   } else {
     renderDatasetMetrics();
   }
-  syncResponsiveLayout();
+
+  if (shouldAutoOpenGuide(urlState)) {
+    openGuide(0, byId('theoryButton'));
+  }
 }
 
 boot().catch((error) => {

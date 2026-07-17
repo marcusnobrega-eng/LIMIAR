@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 280" role="img" aria-labelledby="title desc">
+  <title id="title">LIMIAR lockup</title>
+  <desc id="desc">LIMIAR wordmark with the new atlas-river-threshold emblem.</desc>
+  <defs>
+    <linearGradient id="shieldFill" x1="18%" y1="8%" x2="82%" y2="92%">
+      <stop offset="0%" stop-color="#3B90A0" />
+      <stop offset="58%" stop-color="#1F5E7A" />
+      <stop offset="100%" stop-color="#16475D" />
+    </linearGradient>
+    <linearGradient id="waterFill" x1="50%" y1="26%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#A7DFE4" />
+      <stop offset="100%" stop-color="#4AACC0" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(24 18)">
+    <path d="M25 10h70c11 0 20 9 20 20v43c0 15-7 28-20 36l-35 20-35-20C12 101 5 88 5 73V30C5 19 14 10 25 10Z" fill="url(#shieldFill)" stroke="#0F3644" stroke-width="3" />
+    <path d="M25 20h70c6 0 10 4 10 10v40c0 12-5 21-15 28L60 115 30 98C20 91 15 82 15 70V30c0-6 4-10 10-10Z" fill="#F8F3EA" />
+    <path d="M27 31c10-6 21-9 34-9 12 0 23 3 32 9" fill="none" stroke="#2E8B8B" stroke-width="3" stroke-linecap="round" opacity="0.92" />
+    <path d="M29 39c9-5 19-7 31-7 11 0 21 2 30 7" fill="none" stroke="#6CB7C3" stroke-width="2.8" stroke-linecap="round" opacity="0.88" />
+    <path d="M31 47c8-4 17-6 29-6 10 0 19 2 27 6" fill="none" stroke="#99D6DB" stroke-width="2.6" stroke-linecap="round" opacity="0.82" />
+    <path d="M27 77c5-18 16-31 33-39 17 8 28 21 33 39-9 9-20 16-33 22-13-6-24-13-33-22Z" fill="url(#waterFill)" />
+    <path d="M37 81c4-12 12-20 23-25 11 5 19 13 23 25" fill="none" stroke="#15516A" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M60 38v44" fill="none" stroke="#1A5E77" stroke-width="4" stroke-linecap="round" />
+    <path d="M28 58h64" fill="none" stroke="#D89B2B" stroke-width="6" stroke-linecap="round" />
+    <circle cx="91" cy="58" r="5.2" fill="#C54B3C" />
+    <path d="M34 88c7 4 15 7 26 9 10-2 19-5 26-9" fill="none" stroke="#F8F3EA" stroke-width="2.4" stroke-linecap="round" opacity="0.88" />
+  </g>
+
+  <g transform="translate(178 44)">
+    <text x="0" y="78" fill="#1D2B31" font-family="Fraunces, Georgia, serif" font-size="92" font-weight="700" letter-spacing="0.03em">LIMIAR</text>
+    <text x="0" y="126" fill="#325563" font-family="'Source Sans 3', Helvetica, Arial, sans-serif" font-size="28" font-weight="600">Levels and Indicators for Monitoring Inundation Across Rivers</text>
+    <rect x="0" y="154" width="366" height="10" rx="5" fill="#E1D7C6" />
+    <rect x="0" y="154" width="222" height="10" rx="5" fill="#1F5E7A" />
+  </g>
+</svg>
