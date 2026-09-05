@@ -5,7 +5,7 @@ import {
   ratingDischarge,
   ratingStageFromDischarge,
   summarizeDailyStations,
-} from './core.js';
+} from './core.js?v=2';
 
 const STATUS_MAP = {
   n: 'normal',
