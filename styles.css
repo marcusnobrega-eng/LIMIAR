@@ -1089,8 +1089,48 @@ h3 {
 
 .chart-wrap {
   position: relative;
-  margin-top: 12px;
+  margin-top: 0;
+  padding: 12px 10px 8px;
   min-height: 260px;
+  background:
+    linear-gradient(180deg, rgba(21, 95, 120, 0.025), transparent 36%),
+    #fff;
+}
+
+.chart-card {
+  overflow: hidden;
+  padding: 0;
+  background: #fff;
+}
+
+.chart-card > .section-head {
+  min-height: 58px;
+  padding: 13px 15px 12px;
+  border-bottom: 1px solid rgba(35, 56, 63, 0.09);
+  background: rgba(248, 250, 247, 0.82);
+}
+
+.chart-card > .section-head h3 {
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.chart-card > .section-head span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.chart-card > .evidence-summary,
+.chart-card > .seasonality-summary {
+  margin: 0;
+  padding: 11px 15px 0;
+  font-size: 0.86rem;
+}
+
+.chart-wrap canvas {
+  max-width: 100%;
 }
 
 .evidence-wrap {
