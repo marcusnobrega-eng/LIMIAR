@@ -1,0 +1,26 @@
+name: Improvement
+description: Refine an existing interface, workflow, or implementation.
+title: "[Improvement]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Explain the current behavior and why it should improve.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed improvement
+      description: Describe the intended user-visible result without prescribing unnecessary implementation detail.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
