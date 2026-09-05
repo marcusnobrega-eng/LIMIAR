@@ -13,7 +13,8 @@ describe('published document', () => {
 
   it('loads the application as a native module', () => {
     const document = new JSDOM(html).window.document;
-    const application = document.querySelector('script[src="app.js?v=18"]');
+    const application = [...document.querySelectorAll('script[src]')]
+      .find((script) => script.getAttribute('src')?.startsWith('app.js?'));
     expect(application?.getAttribute('type')).toBe('module');
   });
 });

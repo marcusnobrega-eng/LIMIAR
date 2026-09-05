@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
   </head>
   <body class="app-loading">
     <header class="topbar">
@@ -211,6 +211,7 @@
       <aside class="detail-panel async-region" data-loading-region="station" aria-busy="false">
         <div class="tabbar">
           <button class="active" type="button" data-panel="stationPanel" id="stationTabButton">Estação</button>
+          <button type="button" data-panel="dailyAnalysisPanel" id="dailyAnalysisTabButton">Análise do dia</button>
           <button type="button" data-panel="datasetPanel" id="datasetTabButton">Visão nacional</button>
         </div>
 
@@ -385,6 +386,87 @@
           </section>
         </section>
 
+        <section id="dailyAnalysisPanel" class="panel-view daily-analysis-panel">
+          <div class="daily-analysis-header">
+            <span class="eyebrow" id="dailyAnalysisDate">-</span>
+            <h2 id="dailyAnalysisTitle">Condições na data selecionada</h2>
+            <p id="dailyAnalysisSubtitle">Distribuição das estações filtradas e concentração espacial das condições fora do normal.</p>
+          </div>
+
+          <section class="daily-summary-grid" aria-label="Daily analysis summary">
+            <article>
+              <span id="dailyStationsShownLabel">Estações analisadas</span>
+              <strong id="dailyStationsShown">-</strong>
+            </article>
+            <article>
+              <span id="dailyValidReadingsLabel">Com dado válido</span>
+              <strong id="dailyValidReadings">-</strong>
+            </article>
+            <article class="daily-summary-alert">
+              <span id="dailyOutsideNormalLabel">Fora do normal</span>
+              <strong id="dailyOutsideNormal">-</strong>
+            </article>
+          </section>
+
+          <section class="chart-card daily-analysis-card chart-pending" id="dailyConditionsCard">
+            <div class="section-head">
+              <div>
+                <h3 id="dailyConditionsTitle">Distribuição das condições</h3>
+                <span id="dailyConditionsSubtitle">Número e proporção de estações em cada classe.</span>
+              </div>
+            </div>
+            <div class="chart-wrap daily-condition-wrap">
+              <canvas id="dailyConditionsChart" height="230"></canvas>
+            </div>
+          </section>
+
+          <section class="chart-card daily-analysis-card chart-pending" id="dailySpatialCard">
+            <div class="section-head">
+              <div>
+                <h3 id="dailySpatialTitle">Distribuição espacial das condições fora do normal</h3>
+                <span id="dailySpatialSubtitle">Alertas, inundações e condições extremas agrupados em faixas de 5 graus.</span>
+              </div>
+            </div>
+            <div class="daily-spatial-grid">
+              <article>
+                <h4 id="dailyLatitudeTitle">Por latitude</h4>
+                <div class="chart-wrap daily-spatial-wrap">
+                  <canvas id="dailyLatitudeChart" height="230"></canvas>
+                </div>
+              </article>
+              <article>
+                <h4 id="dailyLongitudeTitle">Por longitude</h4>
+                <div class="chart-wrap daily-spatial-wrap">
+                  <canvas id="dailyLongitudeChart" height="230"></canvas>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="dataset-card daily-analysis-card" id="dailyStateCard">
+            <div class="section-head">
+              <div>
+                <h3 id="dailyStateRankingTitle">Estados com maior proporção fora do normal</h3>
+                <span id="dailyStateRankingSubtitle">Proporção calculada somente entre estações com dado válido.</span>
+              </div>
+            </div>
+            <div class="table-wrap daily-state-table-wrap">
+              <table class="daily-state-table">
+                <thead>
+                  <tr>
+                    <th id="dailyStateColumn">UF</th>
+                    <th id="dailyOutsideColumn">Fora do normal</th>
+                    <th id="dailyValidColumn">Dados válidos</th>
+                    <th id="dailyShareColumn">Proporção</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyStateTableBody"></tbody>
+              </table>
+            </div>
+            <p class="daily-empty-note" id="dailyAnalysisEmpty" hidden>Nenhuma estação fora do normal nesta seleção.</p>
+          </section>
+        </section>
+
         <section id="datasetPanel" class="panel-view">
           <section class="dataset-card">
             <div class="section-head">
@@ -499,6 +581,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script type="module" src="app.js?v=18"></script>
+  <script type="module" src="app.js?v=19"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ import {
   quantileFromSorted,
   ratingDischarge,
   ratingStageFromDischarge,
+  summarizeDailyStations,
 } from './core.js';
 
 const STATUS_MAP = {
@@ -97,7 +98,26 @@ const TEXT = {
     selectedMetricQaLabel: 'Incerteza',
     legendTitle: 'Legenda',
     stationTabButton: 'Estação',
+    dailyAnalysisTabButton: 'Análise do dia',
     datasetTabButton: 'Visão nacional',
+    dailyAnalysisTitle: 'Condições na data selecionada',
+    dailyAnalysisSubtitle: 'Distribuição das estações filtradas e concentração espacial das condições fora do normal.',
+    dailyStationsShownLabel: 'Estações analisadas',
+    dailyValidReadingsLabel: 'Com dado válido',
+    dailyOutsideNormalLabel: 'Fora do normal',
+    dailyConditionsTitle: 'Distribuição das condições',
+    dailyConditionsSubtitle: 'Número e proporção de estações em cada classe.',
+    dailySpatialTitle: 'Distribuição espacial das condições fora do normal',
+    dailySpatialSubtitle: 'Alertas, inundações e condições extremas agrupados em faixas de 5 graus.',
+    dailyLatitudeTitle: 'Por latitude',
+    dailyLongitudeTitle: 'Por longitude',
+    dailyStateRankingTitle: 'Estados com maior proporção fora do normal',
+    dailyStateRankingSubtitle: 'Proporção calculada somente entre estações com dado válido.',
+    dailyStateColumn: 'UF',
+    dailyOutsideColumn: 'Fora do normal',
+    dailyValidColumn: 'Dados válidos',
+    dailyShareColumn: 'Proporção',
+    dailyNoCriticalData: 'Nenhuma estação fora do normal nesta seleção.',
     stationHeading: 'Estação',
     stationSubheading: 'Nenhuma estação selecionada',
     exportStationDataButton: 'Baixar dados CSV',
@@ -385,7 +405,26 @@ const TEXT = {
     selectedMetricQaLabel: 'Uncertainty',
     legendTitle: 'Legend',
     stationTabButton: 'Station',
+    dailyAnalysisTabButton: 'Daily analysis',
     datasetTabButton: 'Brazil overview',
+    dailyAnalysisTitle: 'Conditions on the selected date',
+    dailyAnalysisSubtitle: 'Distribution of filtered stations and spatial concentration of conditions outside normal.',
+    dailyStationsShownLabel: 'Stations analyzed',
+    dailyValidReadingsLabel: 'With valid data',
+    dailyOutsideNormalLabel: 'Outside normal',
+    dailyConditionsTitle: 'Distribution of conditions',
+    dailyConditionsSubtitle: 'Number and share of stations in each class.',
+    dailySpatialTitle: 'Spatial distribution of conditions outside normal',
+    dailySpatialSubtitle: 'Warning, flooded, and extreme conditions grouped into five-degree bands.',
+    dailyLatitudeTitle: 'By latitude',
+    dailyLongitudeTitle: 'By longitude',
+    dailyStateRankingTitle: 'States with the highest share outside normal',
+    dailyStateRankingSubtitle: 'Share calculated only among stations with valid data.',
+    dailyStateColumn: 'State',
+    dailyOutsideColumn: 'Outside normal',
+    dailyValidColumn: 'Valid data',
+    dailyShareColumn: 'Share',
+    dailyNoCriticalData: 'No station is outside normal in this selection.',
     stationHeading: 'Station',
     stationSubheading: 'No station selected',
     exportStationDataButton: 'Download station CSVs',
@@ -950,6 +989,7 @@ const state = {
   mapObserver: null,
   chartObserver: null,
   chartRenderToken: 0,
+  dailyAnalysisDirty: true,
   progressHideTimer: null,
 };
 
@@ -2202,7 +2242,7 @@ function applyStaticTranslations() {
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
     'selectedMetricStatusLabel', 'selectedMetricBasisLabel', 'selectedMetricQaLabel', 'legendTitle',
-    'stationTabButton', 'datasetTabButton', 'exportStationDataButton', 'exportTimeseriesCsvButton', 'exportCrossSectionCsvButton', 'exportDynamicDailyCsvButton', 'exportRatingCurveCsvButton', 'exportEvidenceCsvButton', 'exportSeasonalityCsvButton', 'exportEventsCsvButton', 'exportReportButton', 'metadataTitle', 'timeseriesTitle',
+    'stationTabButton', 'dailyAnalysisTabButton', 'datasetTabButton', 'dailyAnalysisTitle', 'dailyAnalysisSubtitle', 'dailyStationsShownLabel', 'dailyValidReadingsLabel', 'dailyOutsideNormalLabel', 'dailyConditionsTitle', 'dailyConditionsSubtitle', 'dailySpatialTitle', 'dailySpatialSubtitle', 'dailyLatitudeTitle', 'dailyLongitudeTitle', 'dailyStateRankingTitle', 'dailyStateRankingSubtitle', 'dailyStateColumn', 'dailyOutsideColumn', 'dailyValidColumn', 'dailyShareColumn', 'exportStationDataButton', 'exportTimeseriesCsvButton', 'exportCrossSectionCsvButton', 'exportDynamicDailyCsvButton', 'exportRatingCurveCsvButton', 'exportEvidenceCsvButton', 'exportSeasonalityCsvButton', 'exportEventsCsvButton', 'exportReportButton', 'metadataTitle', 'timeseriesTitle',
     'crossSectionTitle', 'crossSectionSubtitle', 'dynamicDailyTitle', 'dynamicDailySubtitle', 'ratingCurveTitle', 'ratingCurveSubtitle',
     'evidenceTitle', 'evidenceSubtitle', 'eventSummaryTitle', 'seasonalityTitle', 'seasonalitySubtitle', 'recentEventsTitle', 'qaTitle', 'datasetTotalsTitle', 'sampleDescriptionTitle', 'statusTotalsTitle', 'datasetBreakdownTitle',
     'howToReadTitle', 'howToReadText', 'caveatTitle', 'caveatText', 'thStartDate', 'thPeakDate', 'thDuration',
@@ -2450,6 +2490,8 @@ function applyFilters() {
   renderStationList();
   renderMap();
   renderDatasetMetrics();
+  state.dailyAnalysisDirty = true;
+  renderDailyAnalysisIfVisible();
 }
 
 function renderStationList() {
@@ -2644,6 +2686,174 @@ function renderDatasetMetrics() {
       [TEXT[state.lang].datasetNarratives.geographyTitle, geographyNarrative],
     ].map(([title, body]) => `<article><h4>${title}</h4><p>${body}</p></article>`).join('');
   }
+}
+
+const DAILY_CONDITION_ORDER = ['extreme_flooding', 'flooded', 'warning', 'normal', 'no_data'];
+const DAILY_SPATIAL_ORDER = ['warning', 'flooded', 'extreme_flooding'];
+
+const dailyConditionLabelsPlugin = {
+  id: 'dailyConditionLabels',
+  afterDatasetsDraw(chart, _args, options) {
+    if (!options?.enabled) return;
+    const dataset = chart.data.datasets[0];
+    const total = Number(options.total) || 0;
+    const metadata = chart.getDatasetMeta(0);
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.fillStyle = CHART_THEME.text;
+    ctx.font = '600 11px "Source Sans 3", sans-serif';
+    ctx.textBaseline = 'middle';
+    metadata.data.forEach((bar, index) => {
+      const value = Number(dataset.data[index]) || 0;
+      const share = total > 0 ? (value / total) * 100 : 0;
+      const label = `${formatNumber(value)} · ${formatNumber(share, 1)}%`;
+      const desiredX = bar.x + 8;
+      const width = ctx.measureText(label).width;
+      const fitsOutside = desiredX + width <= chartArea.right;
+      ctx.textAlign = fitsOutside ? 'left' : 'right';
+      ctx.fillStyle = fitsOutside ? CHART_THEME.text : '#ffffff';
+      ctx.fillText(label, fitsOutside ? desiredX : bar.x - 8, bar.y);
+    });
+    ctx.restore();
+  },
+};
+
+function dailyAnalysisRows() {
+  return state.filteredStations.map((station) => ({
+    stationCode: station.station_code,
+    uf: station.uf,
+    lat: station.lat,
+    lon: station.lon,
+    status: getStatusInfo(station.station_code, state.selectedDate).status,
+  }));
+}
+
+function coordinateBinLabel(bin, axis) {
+  const center = (bin.start + bin.end) / 2;
+  const suffix = axis === 'latitude'
+    ? (center < 0 ? 'S' : 'N')
+    : (center < 0 ? 'W' : 'E');
+  return `${formatNumber(Math.abs(center), 1)}°${suffix}`;
+}
+
+function renderDailyConditionChart(summary) {
+  const canvas = byId('dailyConditionsChart');
+  if (!canvas) return;
+  destroyChart('dailyConditionsChart');
+  const counts = DAILY_CONDITION_ORDER.map((key) => summary.statusCounts[key]);
+  state.charts.dailyConditionsChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: DAILY_CONDITION_ORDER.map(statusLabel),
+      datasets: [{
+        data: counts,
+        backgroundColor: DAILY_CONDITION_ORDER.map((key) => STATUS_COLORS[key]),
+        borderColor: DAILY_CONDITION_ORDER.map((key) => STATUS_COLORS[key]),
+        borderWidth: 1,
+        borderRadius: 7,
+        borderSkipped: false,
+        maxBarThickness: 26,
+      }],
+    },
+    plugins: [dailyConditionLabelsPlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      animation: false,
+      layout: { padding: { right: 74 } },
+      plugins: chartPlugins({
+        legend: chartLegend({ display: false }),
+        dailyConditionLabels: { enabled: true, total: summary.total },
+        tooltip: {
+          callbacks: {
+            label: (context) => formatCountShare(Number(context.raw), summary.total),
+          },
+        },
+      }),
+      scales: {
+        x: chartScale({ beginAtZero: true, maxTicksLimit: 5 }),
+        y: chartScale({ displayGrid: false }),
+      },
+    },
+  });
+}
+
+function renderDailySpatialChart(id, bins, axis) {
+  const canvas = byId(id);
+  if (!canvas) return;
+  destroyChart(id);
+  state.charts[id] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: bins.map((bin) => coordinateBinLabel(bin, axis)),
+      datasets: DAILY_SPATIAL_ORDER.map((status) => ({
+        label: statusLabel(status),
+        data: bins.map((bin) => bin.counts[status]),
+        backgroundColor: STATUS_COLORS[status],
+        borderColor: STATUS_COLORS[status],
+        borderWidth: 1,
+        borderRadius: 3,
+        borderSkipped: false,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: chartPlugins({
+        legend: chartLegend({ position: 'bottom' }),
+      }),
+      scales: {
+        x: { ...chartScale({ displayGrid: false, maxTicksLimit: 6 }), stacked: true },
+        y: { ...chartScale({ beginAtZero: true, maxTicksLimit: 5 }), stacked: true },
+      },
+    },
+  });
+}
+
+function renderDailyStateRanking(summary) {
+  const body = byId('dailyStateTableBody');
+  const empty = byId('dailyAnalysisEmpty');
+  if (!body || !empty) return;
+  body.innerHTML = summary.stateRanking.map((row) => `
+    <tr>
+      <td data-label="${text('dailyStateColumn')}"><strong>${row.uf}</strong></td>
+      <td data-label="${text('dailyOutsideColumn')}">${formatNumber(row.outsideNormal)}</td>
+      <td data-label="${text('dailyValidColumn')}">${formatNumber(row.valid)}</td>
+      <td data-label="${text('dailyShareColumn')}">
+        <div class="daily-share-cell">
+          <strong>${formatNumber(row.share * 100, 1)}%</strong>
+          <span aria-hidden="true"><i style="width:${Math.min(100, row.share * 100)}%"></i></span>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  empty.hidden = summary.stateRanking.length > 0;
+}
+
+function renderDailyAnalysis() {
+  if (!state.manifest || !state.selectedDate) return;
+  const summary = summarizeDailyStations(dailyAnalysisRows());
+  byId('dailyAnalysisDate').textContent = formatDate(state.selectedDate);
+  byId('dailyStationsShown').textContent = formatNumber(summary.total);
+  byId('dailyValidReadings').textContent = formatCountShare(summary.valid, summary.total);
+  byId('dailyOutsideNormal').textContent = formatCountShare(summary.outsideNormal, summary.valid);
+  renderDailyConditionChart(summary);
+  renderDailySpatialChart('dailyLatitudeChart', summary.latitudeBins, 'latitude');
+  renderDailySpatialChart('dailyLongitudeChart', summary.longitudeBins, 'longitude');
+  renderDailyStateRanking(summary);
+  ['dailyConditionsCard', 'dailySpatialCard'].forEach((id) => {
+    byId(id)?.classList.remove('chart-pending');
+    byId(id)?.classList.add('chart-ready');
+  });
+  state.dailyAnalysisDirty = false;
+}
+
+function renderDailyAnalysisIfVisible() {
+  if (!state.dailyAnalysisDirty || !byId('dailyAnalysisPanel')?.classList.contains('active')) return;
+  window.requestAnimationFrame(renderDailyAnalysis);
 }
 
 function utcDayNumber(dateString) {
@@ -4993,6 +5203,7 @@ function wireEvents() {
       document.querySelectorAll('.panel-view').forEach((panel) => {
         panel.classList.toggle('active', panel.id === button.dataset.panel);
       });
+      renderDailyAnalysisIfVisible();
     });
   });
 }
