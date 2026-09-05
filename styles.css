@@ -19,6 +19,12 @@
   --ok: #2f7f8f;
   --shadow: 0 18px 40px rgba(33, 40, 42, 0.12);
   --radius: 16px;
+  --motion-fast: 140ms;
+  --motion-standard: 220ms;
+  --motion-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-exit: cubic-bezier(0.4, 0, 1, 1);
+  --skeleton-base: rgba(31, 94, 122, 0.08);
+  --skeleton-highlight: rgba(255, 255, 255, 0.72);
 }
 
 * {
@@ -191,7 +197,20 @@ select {
 .range-button {
   padding: 0 14px;
   font-weight: 700;
-  transition: 160ms ease;
+  transition:
+    transform var(--motion-fast) var(--motion-enter),
+    border-color var(--motion-fast) var(--motion-enter),
+    box-shadow var(--motion-fast) var(--motion-enter),
+    background-color var(--motion-fast) var(--motion-enter),
+    color var(--motion-fast) var(--motion-enter);
+}
+
+.toolbar-button:active,
+.download-button:active,
+.date-step-button:active,
+.lang-button:active,
+.range-button:active {
+  transform: scale(0.98);
 }
 
 .lang-button {
@@ -272,7 +291,167 @@ input:focus-visible {
   height: 100vh;
   padding-top: 74px;
   display: grid;
-  grid-template-columns: clamp(404px, 28vw, 456px) minmax(420px, 1fr) clamp(520px, 32vw, 600px);
+  grid-template-columns: clamp(360px, 28vw, 456px) minmax(320px, 1fr) clamp(460px, 32vw, 600px);
+}
+
+.app-progress {
+  position: fixed;
+  top: 74px;
+  right: 0;
+  left: 0;
+  z-index: 1250;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 5px 14px;
+  background: rgba(247, 242, 231, 0.96);
+  box-shadow: 0 8px 18px rgba(29, 43, 49, 0.08);
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-fast) var(--motion-enter),
+    transform var(--motion-fast) var(--motion-enter);
+}
+
+.app-progress.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-progress-track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(31, 94, 122, 0.12);
+}
+
+.app-progress-track > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left center;
+  transition: transform var(--motion-standard) var(--motion-enter);
+}
+
+.app-progress.indeterminate .app-progress-track > span {
+  transform-origin: center;
+  animation: progress-indeterminate 1.1s linear infinite;
+}
+
+.app-progress strong {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-70%) scaleX(0.24); }
+  50% { transform: translateX(0) scaleX(0.58); }
+  100% { transform: translateX(70%) scaleX(0.24); }
+}
+
+.async-region {
+  position: relative;
+}
+
+.async-region.is-loading {
+  overflow: hidden;
+}
+
+.async-region.is-loading:not(.station-list-card)::after,
+.chart-card.chart-pending .chart-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 950;
+  border-radius: inherit;
+  background:
+    linear-gradient(100deg, transparent 20%, var(--skeleton-highlight) 42%, transparent 64%) -120% 0 / 65% 100% no-repeat,
+    repeating-linear-gradient(180deg, var(--skeleton-base) 0 16px, transparent 16px 30px),
+    rgba(255, 252, 245, 0.9);
+  animation: skeleton-shimmer 1.25s linear infinite;
+}
+
+.chart-card.chart-ready .chart-wrap {
+  animation: chart-enter var(--motion-standard) var(--motion-enter) both;
+}
+
+@keyframes chart-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.map-stage.is-loading::after {
+  background:
+    linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.52) 42%, transparent 64%) -120% 0 / 65% 100% no-repeat,
+    radial-gradient(circle at 30% 36%, rgba(46, 139, 139, 0.16), transparent 24%),
+    repeating-linear-gradient(155deg, rgba(31, 94, 122, 0.08) 0 2px, transparent 2px 28px),
+    #e8eee9;
+}
+
+.chart-card.chart-pending .chart-wrap::after {
+  inset: 0;
+  border: 1px solid rgba(188, 174, 151, 0.45);
+  background:
+    linear-gradient(100deg, transparent 20%, var(--skeleton-highlight) 42%, transparent 64%) -120% 0 / 65% 100% no-repeat,
+    repeating-linear-gradient(180deg, transparent 0 42px, rgba(31, 94, 122, 0.08) 42px 43px),
+    rgba(255, 252, 245, 0.92);
+}
+
+@keyframes skeleton-shimmer {
+  to { background-position: 220% 0, 0 0, 0 0; }
+}
+
+.station-skeleton {
+  height: 118px;
+  border-radius: 14px;
+  background:
+    linear-gradient(100deg, transparent 20%, var(--skeleton-highlight) 42%, transparent 64%) -120% 0 / 65% 100% no-repeat,
+    linear-gradient(var(--skeleton-base), var(--skeleton-base)) 12px 14px / 54% 14px no-repeat,
+    linear-gradient(var(--skeleton-base), var(--skeleton-base)) 12px 42px / 74% 11px no-repeat,
+    linear-gradient(var(--skeleton-base), var(--skeleton-base)) 12px 68px / 62% 10px no-repeat,
+    rgba(31, 94, 122, 0.04);
+  animation: skeleton-shimmer 1.25s linear infinite;
+}
+
+.load-more-button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+body.app-ready .sidebar,
+body.app-ready .map-stage,
+body.app-ready .detail-panel {
+  animation: region-enter var(--motion-standard) var(--motion-enter) both;
+}
+
+body.app-ready .map-stage { animation-delay: 35ms; }
+body.app-ready .detail-panel { animation-delay: 70ms; }
+
+@keyframes region-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
 }
 
 .sidebar,
@@ -509,7 +688,10 @@ h3 {
   background: rgba(255, 252, 245, 0.92);
   padding: 12px;
   text-align: left;
-  transition: 160ms ease;
+  transition:
+    transform var(--motion-fast) var(--motion-enter),
+    border-color var(--motion-fast) var(--motion-enter),
+    box-shadow var(--motion-fast) var(--motion-enter);
 }
 
 .station-item:hover,
@@ -676,6 +858,18 @@ h3 {
 .panel-view.active {
   display: grid;
   gap: 14px;
+  animation: panel-enter var(--motion-standard) var(--motion-enter) both;
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .panel-head p,
@@ -1039,7 +1233,9 @@ th {
   color: #fff;
   opacity: 0;
   pointer-events: none;
-  transition: 160ms ease;
+  transition:
+    opacity var(--motion-fast) var(--motion-enter),
+    transform var(--motion-fast) var(--motion-enter);
 }
 
 .toast.show {
@@ -1070,6 +1266,15 @@ body.modal-open {
   display: grid;
   place-items: center;
   padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-exit);
+}
+
+.overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transition-timing-function: var(--motion-enter);
 }
 
 .overlay[hidden] {
@@ -1081,6 +1286,12 @@ body.modal-open {
   inset: 0;
   background: rgba(29, 43, 49, 0.54);
   backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-enter);
+}
+
+.overlay.is-open .overlay-backdrop {
+  opacity: 1;
 }
 
 .overlay-panel {
@@ -1096,6 +1307,19 @@ body.modal-open {
     linear-gradient(145deg, rgba(31, 94, 122, 0.08), rgba(216, 155, 43, 0.04)),
     rgba(255, 252, 245, 0.98);
   box-shadow: 0 28px 70px rgba(22, 31, 34, 0.24);
+  opacity: 0;
+  transform: translateY(8px);
+  filter: blur(3px);
+  transition:
+    opacity var(--motion-standard) var(--motion-enter),
+    transform var(--motion-standard) var(--motion-enter),
+    filter var(--motion-standard) var(--motion-enter);
+}
+
+.overlay.is-open .overlay-panel {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
 }
 
 .overlay-close {
@@ -1272,7 +1496,10 @@ body.modal-open {
   border: 1px solid rgba(91, 106, 113, 0.32);
   border-radius: 999px;
   background: rgba(255, 252, 245, 0.96);
-  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, width 0.18s ease;
+  transition:
+    transform var(--motion-fast) var(--motion-enter),
+    background-color var(--motion-fast) var(--motion-enter),
+    border-color var(--motion-fast) var(--motion-enter);
 }
 
 .guide-dot.active {
@@ -1598,6 +1825,10 @@ body.modal-open {
     display: block;
   }
 
+  .app-progress {
+    top: 126px;
+  }
+
   .sidebar,
   .detail-panel,
   #map {
@@ -1743,5 +1974,24 @@ body.modal-open {
 
   .guide-visual-image {
     max-height: 230px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .toolbar-button:active,
+  .download-button:active,
+  .date-step-button:active,
+  .lang-button:active,
+  .range-button:active {
+    transform: none;
   }
 }

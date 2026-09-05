@@ -122,6 +122,10 @@ const TEXT = {
     thPeak: 'Pico',
     thClass: 'Classe',
     visibleStations: 'visíveis',
+    loadMoreStations: 'Carregar mais',
+    loadingAtlas: 'Carregando o atlas...',
+    loadingDate: 'Carregando a data...',
+    loadingStation: 'Carregando a estação...',
     fullRecordLabel: 'Registro completo',
     allStatesLabel: 'Todas',
     allBasinsLabel: 'Todas',
@@ -405,6 +409,10 @@ const TEXT = {
     thPeak: 'Peak',
     thClass: 'Class',
     visibleStations: 'visible',
+    loadMoreStations: 'Load more',
+    loadingAtlas: 'Loading atlas...',
+    loadingDate: 'Loading date...',
+    loadingStation: 'Loading station...',
     fullRecordLabel: 'Full record',
     allStatesLabel: 'All',
     allBasinsLabel: 'All',
@@ -883,6 +891,11 @@ const MONTH_LABELS = {
 };
 
 const DEFAULT_STATION_CODE = '83250000';
+const STATION_LIST_BATCH_MOBILE = 60;
+const STATION_LIST_BATCH_DESKTOP = 120;
+const REDUCED_MOTION_QUERY = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+let map = null;
 
 const state = {
   lang: 'en',
@@ -916,6 +929,11 @@ const state = {
   dateStepRepeatTimer: null,
   dateStepSuppressClick: false,
   dateStepBusy: false,
+  visibleStationLimit: 0,
+  mapObserver: null,
+  chartObserver: null,
+  chartRenderToken: 0,
+  progressHideTimer: null,
 };
 
 const BASEMAP_DEFS = {
@@ -931,21 +949,42 @@ const BASEMAP_DEFS = {
   },
 };
 
-const map = L.map('map', {
-  preferCanvas: true,
-  zoomControl: true,
-}).setView([-14.5, -52.5], 4);
-
-Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
-  state.baseLayers[key] = L.tileLayer(config.url, {
-    attribution: config.attribution,
-    maxZoom: config.maxZoom,
-  });
-});
-state.baseLayers[state.basemap].addTo(map);
-
 function byId(id) {
   return document.getElementById(id);
+}
+
+function stationListBatchSize() {
+  return window.matchMedia('(max-width: 920px)').matches
+    ? STATION_LIST_BATCH_MOBILE
+    : STATION_LIST_BATCH_DESKTOP;
+}
+
+function setRegionLoading(name, isLoading) {
+  const node = document.querySelector(`[data-loading-region="${name}"]`);
+  if (!node) return;
+  node.classList.toggle('is-loading', isLoading);
+  node.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+}
+
+function setAppProgress(value, label, indeterminate = false) {
+  const node = byId('appProgress');
+  const bar = byId('appProgressBar');
+  const textNode = byId('appProgressLabel');
+  if (!node || !bar || !textNode) return;
+  if (state.progressHideTimer) window.clearTimeout(state.progressHideTimer);
+  const progress = Math.max(0, Math.min(100, Number(value) || 0));
+  bar.style.setProperty('--progress', String(progress / 100));
+  node.setAttribute('aria-valuenow', String(Math.round(progress)));
+  node.classList.toggle('indeterminate', indeterminate);
+  textNode.textContent = label;
+  node.classList.add('visible');
+}
+
+function completeAppProgress() {
+  setAppProgress(100, text('loadingAtlas'));
+  state.progressHideTimer = window.setTimeout(() => {
+    byId('appProgress')?.classList.remove('visible', 'indeterminate');
+  }, REDUCED_MOTION_QUERY.matches ? 0 : 320);
 }
 
 function text(key) {
@@ -1073,14 +1112,23 @@ function openOverlay(id) {
   if (!node) return;
   node.hidden = false;
   document.body.classList.add('modal-open');
+  window.requestAnimationFrame(() => node.classList.add('is-open'));
 }
 
 function closeOverlay(id) {
   const node = byId(id);
   if (!node) return;
-  node.hidden = true;
-  if (!Array.from(document.querySelectorAll('.overlay')).some((overlay) => !overlay.hidden)) {
-    document.body.classList.remove('modal-open');
+  node.classList.remove('is-open');
+  const finish = () => {
+    node.hidden = true;
+    if (!Array.from(document.querySelectorAll('.overlay')).some((overlay) => !overlay.hidden)) {
+      document.body.classList.remove('modal-open');
+    }
+  };
+  if (REDUCED_MOTION_QUERY.matches) {
+    finish();
+  } else {
+    window.setTimeout(finish, 230);
   }
 }
 
@@ -1328,8 +1376,53 @@ function handleGuideKeydown(event) {
   return false;
 }
 
+function ensureMap() {
+  if (map) return map;
+  setRegionLoading('map', true);
+  map = L.map('map', {
+    preferCanvas: true,
+    zoomControl: true,
+  }).setView([-14.5, -52.5], 4);
+
+  Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
+    state.baseLayers[key] = L.tileLayer(config.url, {
+      attribution: config.attribution,
+      maxZoom: config.maxZoom,
+    });
+  });
+
+  const activeLayer = state.baseLayers[state.basemap];
+  activeLayer.once('load', () => setRegionLoading('map', false));
+  activeLayer.addTo(map);
+  window.setTimeout(() => setRegionLoading('map', false), 1800);
+  renderMap();
+  return map;
+}
+
+function observeMap() {
+  const stage = document.querySelector('[data-loading-region="map"]');
+  if (!stage || map) return;
+  if (!('IntersectionObserver' in window)) {
+    ensureMap();
+    return;
+  }
+  state.mapObserver?.disconnect();
+  state.mapObserver = new IntersectionObserver((entries, observer) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    observer.disconnect();
+    ensureMap();
+  }, { rootMargin: '160px' });
+  state.mapObserver.observe(stage);
+}
+
 function setBasemap(key) {
-  if (!state.baseLayers[key] || state.basemap === key) return;
+  if (state.basemap === key) return;
+  if (!map) {
+    state.basemap = key;
+    ensureMap();
+    return;
+  }
+  if (!state.baseLayers[key]) return;
   map.removeLayer(state.baseLayers[state.basemap]);
   state.basemap = key;
   state.baseLayers[key].addTo(map);
@@ -2211,6 +2304,7 @@ function applyFilters() {
     if (filters.biome !== 'all' && station.biome !== filters.biome) return false;
     return true;
   });
+  state.visibleStationLimit = stationListBatchSize();
   renderStationList();
   renderMap();
   renderDatasetMetrics();
@@ -2218,8 +2312,13 @@ function applyFilters() {
 
 function renderStationList() {
   const list = byId('stationList');
+  const loadMoreButton = byId('loadMoreStationsButton');
+  const batchSize = stationListBatchSize();
+  if (!state.visibleStationLimit) state.visibleStationLimit = batchSize;
+  const visibleStations = state.filteredStations.slice(0, state.visibleStationLimit);
   list.innerHTML = '';
-  state.filteredStations.forEach((station) => {
+  const fragment = document.createDocumentFragment();
+  visibleStations.forEach((station) => {
     const info = getStatusInfo(station.station_code, state.selectedDate);
     const basisKey = resolvedBasisKey(info.basis, station.threshold_basis);
     const button = document.createElement('button');
@@ -2236,13 +2335,19 @@ function renderStationList() {
       </div>
     `;
     button.addEventListener('click', () => selectStation(station.station_code));
-    list.appendChild(button);
+    fragment.appendChild(button);
   });
+  list.appendChild(fragment);
+  const remaining = Math.max(0, state.filteredStations.length - visibleStations.length);
+  loadMoreButton.hidden = remaining === 0;
+  loadMoreButton.textContent = `${text('loadMoreStations')} (${formatNumber(remaining)})`;
   byId('visibleCount').textContent = `${state.filteredStations.length} ${text('visibleStations')}`;
   byId('listCount').textContent = formatNumber(state.filteredStations.length);
+  setRegionLoading('list', false);
 }
 
 function renderMap() {
+  if (!map) return;
   if (state.markersLayer) state.markersLayer.remove();
   state.markersLayer = L.layerGroup();
   if (!state.mapVisibility.stations) {
@@ -2349,6 +2454,7 @@ function renderMetricArticles(container, items) {
 function renderDatasetMetrics() {
   const allStations = state.stations || [];
   const totalCount = allStations.length || Number(state.manifest?.published_station_count || 0);
+  const qaPanelCount = Number(state.manifest?.counts?.qa_panels_copied || 0);
   const hydraulicCount = allStations.filter((station) => station.threshold_basis === 'hydraulic').length;
   const q2FallbackCount = allStations.filter((station) => station.threshold_basis === 'q2_fallback').length;
   const crossSectionCount = allStations.filter((station) => station.has_cross_sections).length;
@@ -2363,7 +2469,7 @@ function renderDatasetMetrics() {
     [text('statStationsLabel'), formatNumber(state.manifest.published_station_count)],
     [text('statRangeLabel'), `${formatShortDate(state.manifest.supported_date_min)} - ${formatShortDate(state.manifest.supported_date_max)}`],
     [text('statLatestLabel'), formatShortDate(state.manifest.latest_status_date)],
-    [text('qaPanelsLabel'), formatNumber(state.manifest.counts.qa_panels_copied)],
+    [text('qaPanelsLabel'), formatNumber(qaPanelCount)],
   ]);
 
   renderMetricArticles(byId('sampleMetrics'), [
@@ -2383,8 +2489,8 @@ function renderDatasetMetrics() {
     ? `${formatCountShare(hydraulicCount, totalCount)} usam limiar hidráulico observado, enquanto ${formatCountShare(q2FallbackCount, totalCount)} dependem de fallback Q2.`
     : `${formatCountShare(hydraulicCount, totalCount)} use observed hydraulic thresholds, while ${formatCountShare(q2FallbackCount, totalCount)} rely on Q2 fallback.`;
   const evidenceNarrative = state.lang === 'pt'
-    ? `${formatCountShare(crossSectionCount, totalCount)} contam com seção transversal observada, ${formatCountShare(ratingCurveCount, totalCount)} têm curva-chave disponível, e ${formatNumber(state.manifest.counts.qa_panels_copied)} painéis QA pré-renderizados acompanham este pacote.`
-    : `${formatCountShare(crossSectionCount, totalCount)} include observed cross sections, ${formatCountShare(ratingCurveCount, totalCount)} have rating curves available, and ${formatNumber(state.manifest.counts.qa_panels_copied)} pre-rendered QA panels are bundled in this package.`;
+    ? `${formatCountShare(crossSectionCount, totalCount)} contam com seção transversal observada, ${formatCountShare(ratingCurveCount, totalCount)} têm curva-chave disponível, e ${formatNumber(qaPanelCount)} painéis QA pré-renderizados acompanham este pacote.`
+    : `${formatCountShare(crossSectionCount, totalCount)} include observed cross sections, ${formatCountShare(ratingCurveCount, totalCount)} have rating curves available, and ${formatNumber(qaPanelCount)} pre-rendered QA panels are bundled in this package.`;
   const geographyNarrative = state.lang === 'pt'
     ? `UFs com mais estações: ${formatTopCategories(topCategories(allStations, 'uf'))}. Biomas mais frequentes: ${formatTopCategories(topCategories(allStations, 'biome'))}.`
     : `States with the most stations: ${formatTopCategories(topCategories(allStations, 'uf'))}. Most common biomes: ${formatTopCategories(topCategories(allStations, 'biome'))}.`;
@@ -2686,6 +2792,52 @@ function destroyChart(id) {
     state.charts[id].destroy();
     delete state.charts[id];
   }
+}
+
+const STATION_CHART_RENDERERS = {
+  timeseriesChart: renderTimeseriesChart,
+  crossSectionChart: renderCrossSectionChart,
+  dynamicDailyChart: renderDynamicDailyChart,
+  ratingCurveChart: renderRatingCurveChart,
+  evidenceChart: renderEvidenceChart,
+  seasonalityChart: renderSeasonality,
+};
+
+function renderStationCharts(stationData, eager = false) {
+  state.chartObserver?.disconnect();
+  state.chartObserver = null;
+  const token = ++state.chartRenderToken;
+  const entries = Object.entries(STATION_CHART_RENDERERS)
+    .map(([id, renderer]) => ({ id, renderer, canvas: byId(id) }))
+    .filter((entry) => entry.canvas);
+
+  const renderEntry = (entry) => {
+    if (token !== state.chartRenderToken || state.selectedData !== stationData) return;
+    entry.renderer(stationData);
+    const card = entry.canvas.closest('.chart-card');
+    card?.classList.remove('chart-pending');
+    card?.classList.add('chart-ready');
+  };
+
+  entries.forEach((entry) => {
+    const card = entry.canvas.closest('.chart-card');
+    card?.classList.remove('chart-ready');
+    card?.classList.add('chart-pending');
+  });
+  if (eager || !('IntersectionObserver' in window)) {
+    entries.forEach(renderEntry);
+    return;
+  }
+
+  state.chartObserver = new IntersectionObserver((observed, observer) => {
+    observed.forEach((item) => {
+      if (!item.isIntersecting) return;
+      const entry = entries.find((candidate) => candidate.canvas.closest('.chart-card') === item.target);
+      if (entry) renderEntry(entry);
+      observer.unobserve(item.target);
+    });
+  }, { rootMargin: '180px 0px' });
+  entries.forEach((entry) => state.chartObserver.observe(entry.canvas.closest('.chart-card')));
 }
 
 function renderTimeseriesChart(stationData) {
@@ -3505,6 +3657,7 @@ function renderQaSection(stationData) {
     fallback.textContent = '';
     fallback.hidden = true;
     byId('imageOverlayImg').removeAttribute('src');
+    byId('imageOverlayImg').removeAttribute('data-src');
     byId('imageOverlayCaption').textContent = '';
     subpanelList.innerHTML = '';
     subpanelsNode.hidden = true;
@@ -3523,13 +3676,13 @@ function renderQaSection(stationData) {
     caption.textContent = text('qaFigureCaption');
     fallback.textContent = '';
     fallback.hidden = true;
-    byId('imageOverlayImg').src = stationData.qa.panel_png;
+    byId('imageOverlayImg').dataset.src = stationData.qa.panel_png;
     byId('imageOverlayCaption').textContent = text('qaFigureCaption');
     subpanelList.innerHTML = QA_PANEL_PARTS.map((panel) => `
       <article class="qa-subpanel-card">
         <h5>${qaPanelPartLabel(panel.key)}</h5>
         <div class="qa-subpanel-frame ${panel.className}">
-          <img src="${stationData.qa.panel_png}" alt="${qaPanelPartLabel(panel.key)}" loading="lazy" />
+          <img src="${stationData.qa.panel_png}" alt="${qaPanelPartLabel(panel.key)}" loading="lazy" decoding="async" />
         </div>
       </article>
     `).join('');
@@ -3584,20 +3737,21 @@ async function selectStation(stationCode) {
   const station = state.stationByCode.get(stationCode);
   if (!station) return;
   updateUrl();
-  showToast(TEXT[state.lang].toasts.loading, 900);
-  const data = await loadStationData(stationCode);
-  state.selectedData = data;
-  renderStatusCard(data);
-  renderMetadata(data);
-  renderTimeseriesChart(data);
-  renderCrossSectionChart(data);
-  renderDynamicDailyChart(data);
-  renderRatingCurveChart(data);
-  renderEvidenceChart(data);
-  renderEventSummary(data);
-  renderSeasonality(data);
-  renderEventsTable(data);
-  renderQaSection(data);
+  setRegionLoading('station', true);
+  setAppProgress(72, text('loadingStation'), true);
+  try {
+    const data = await loadStationData(stationCode);
+    state.selectedData = data;
+    renderStatusCard(data);
+    renderMetadata(data);
+    renderEventSummary(data);
+    renderEventsTable(data);
+    renderQaSection(data);
+    renderStationCharts(data);
+  } finally {
+    setRegionLoading('station', false);
+    completeAppProgress();
+  }
 }
 
 function updateUrl() {
@@ -3609,6 +3763,7 @@ function updateUrl() {
 }
 
 function fitMapToFiltered() {
+  if (!map) ensureMap();
   if (state.markerBounds) {
     map.fitBounds(state.markerBounds.pad(0.15));
   }
@@ -3633,17 +3788,25 @@ async function setSelectedDate(dateString, preserveSelection = true) {
   byId('datePicker').value = dateString;
   updateDateNavigation();
   byId('datePicker').value = state.selectedDate;
-  await loadMonth(state.selectedDate);
-  applyFilters();
-  if (preserveSelection && state.selectedCode) {
-    if (state.selectedData) {
-      renderStatusCard(state.selectedData);
-      renderTimeseriesChart(state.selectedData);
-    } else {
-      await selectStation(state.selectedCode);
+  setAppProgress(55, text('loadingDate'), true);
+  try {
+    await loadMonth(state.selectedDate);
+    applyFilters();
+    if (preserveSelection && state.selectedCode) {
+      if (state.selectedData) {
+        renderStatusCard(state.selectedData);
+        const timeseriesCard = byId('timeseriesChart').closest('.chart-card');
+        if (!timeseriesCard?.classList.contains('chart-pending')) {
+          renderTimeseriesChart(state.selectedData);
+        }
+      } else {
+        await selectStation(state.selectedCode);
+      }
     }
+    updateUrl();
+  } finally {
+    completeAppProgress();
   }
-  updateUrl();
 }
 
 function exportFilteredCsv() {
@@ -4335,11 +4498,7 @@ async function exportStationReport() {
       document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node.dataset.range === 'full'));
       renderTimeseriesChart(state.selectedData);
     }
-    renderCrossSectionChart(state.selectedData);
-    renderDynamicDailyChart(state.selectedData);
-    renderRatingCurveChart(state.selectedData);
-    renderEvidenceChart(state.selectedData);
-    renderSeasonality(state.selectedData);
+    renderStationCharts(state.selectedData, true);
     const chartBytes = await safeChartToBytes('timeseriesChart', 2800, 1500);
     const crossSectionBytes = await safeChartToBytes('crossSectionChart', 2600, 1500);
     const dynamicDailyBytes = await safeChartToBytes('dynamicDailyChart', 2800, 1500);
@@ -4614,6 +4773,10 @@ function wireEvents() {
     byId(id).addEventListener('input', applyFilters);
     byId(id).addEventListener('change', applyFilters);
   });
+  byId('loadMoreStationsButton').addEventListener('click', () => {
+    state.visibleStationLimit += stationListBatchSize();
+    renderStationList();
+  });
   byId('datePicker').addEventListener('change', async (event) => {
     if (event.target.value) await setSelectedDate(event.target.value);
   });
@@ -4659,7 +4822,11 @@ function wireEvents() {
   });
   byId('exportReportButton').addEventListener('click', exportStationReport);
   byId('openQaImageButton').addEventListener('click', () => {
-    if (!byId('qaImage').hidden) openOverlay('imageOverlay');
+    if (!byId('qaImage').hidden) {
+      const overlayImage = byId('imageOverlayImg');
+      if (!overlayImage.src && overlayImage.dataset.src) overlayImage.src = overlayImage.dataset.src;
+      openOverlay('imageOverlay');
+    }
   });
   byId('closeTheoryButton').addEventListener('click', () => closeGuide(true));
   byId('guidePrevButton').addEventListener('click', () => moveGuideStep(-1));
@@ -4694,15 +4861,10 @@ function wireEvents() {
       if (state.selectedData) {
         renderStatusCard(state.selectedData);
         renderMetadata(state.selectedData);
-        renderTimeseriesChart(state.selectedData);
-        renderCrossSectionChart(state.selectedData);
-        renderDynamicDailyChart(state.selectedData);
-        renderRatingCurveChart(state.selectedData);
-        renderEvidenceChart(state.selectedData);
         renderEventSummary(state.selectedData);
-        renderSeasonality(state.selectedData);
         renderEventsTable(state.selectedData);
         renderQaSection(state.selectedData);
+        renderStationCharts(state.selectedData);
       } else {
         renderEmptySelection();
       }
@@ -4713,7 +4875,10 @@ function wireEvents() {
     button.addEventListener('click', () => {
       state.currentRange = button.dataset.range;
       document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node === button));
-      if (state.selectedData) renderTimeseriesChart(state.selectedData);
+      if (state.selectedData) {
+        renderTimeseriesChart(state.selectedData);
+        byId('timeseriesChart').closest('.chart-card')?.classList.remove('chart-pending');
+      }
     });
   });
   document.querySelectorAll('.tabbar button').forEach((button) => {
@@ -4725,6 +4890,7 @@ function wireEvents() {
 }
 
 async function boot() {
+  setAppProgress(6, text('loadingAtlas'));
   ensureDateNavigator();
   applyStaticTranslations();
   updateLanguageButtons();
@@ -4738,14 +4904,19 @@ async function boot() {
     const redirected = await tryRedirectFromFileMode();
     if (redirected) return;
     showFatalState(text('fatalMessage'), true);
+    completeAppProgress();
     return;
   }
 
+  observeMap();
   state.manifest = await loadJson('data/manifest.json');
+  setAppProgress(28, text('loadingAtlas'));
   state.stations = await loadJson('data/stations.json');
+  setAppProgress(46, text('loadingAtlas'));
   state.stationByCode = new Map(state.stations.map((station) => [station.station_code, station]));
   updateDateNavigation();
   renderGlobalStats();
+  setRegionLoading('summary', false);
 
   const urlState = parseUrlState();
   if (urlState.lang && TEXT[urlState.lang]) {
@@ -4774,7 +4945,12 @@ async function boot() {
     await selectStation(initialStation);
   } else {
     renderDatasetMetrics();
+    completeAppProgress();
   }
+
+  byId('appShell')?.setAttribute('aria-busy', 'false');
+  document.body.classList.remove('app-loading');
+  document.body.classList.add('app-ready');
 
   if (shouldAutoOpenGuide(urlState)) {
     openGuide(0, byId('theoryButton'));
@@ -4783,6 +4959,9 @@ async function boot() {
 
 boot().catch((error) => {
   console.error(error);
+  ['summary', 'list', 'map', 'station'].forEach((name) => setRegionLoading(name, false));
+  byId('appShell')?.setAttribute('aria-busy', 'false');
+  completeAppProgress();
   showFatalState(error?.message || TEXT[state.lang].toasts.loadError, window.location.protocol === 'file:');
   showToast(TEXT[state.lang].toasts.loadError);
 });

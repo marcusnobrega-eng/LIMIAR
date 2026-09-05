@@ -8,9 +8,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=13" />
+    <link rel="stylesheet" href="styles.css?v=14" />
   </head>
-  <body>
+  <body class="app-loading">
     <header class="topbar">
       <a class="brand" href="#">
         <span class="brand-mark" aria-hidden="true">
@@ -53,7 +53,12 @@
       </div>
     </header>
 
-    <main class="app-shell">
+    <div class="app-progress" id="appProgress" role="progressbar" aria-label="Loading atlas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="app-progress-track"><span id="appProgressBar"></span></span>
+      <strong id="appProgressLabel" aria-live="polite">Loading atlas...</strong>
+    </div>
+
+    <main class="app-shell" id="appShell" aria-busy="true">
       <aside class="sidebar">
         <section class="hero-card">
           <span class="eyebrow" id="eyebrowLabel">Atlas histórico e de triagem</span>
@@ -69,7 +74,7 @@
           <pre id="fatalCommand" hidden>python3 -m http.server 8000</pre>
         </section>
 
-        <section class="stats-grid" aria-label="Dataset totals">
+        <section class="stats-grid async-region is-loading" data-loading-region="summary" aria-label="Dataset totals" aria-busy="true">
           <article class="stat-card stat-stations">
             <span id="statStationsLabel">Estações publicadas</span>
             <strong id="statStations">-</strong>
@@ -145,16 +150,22 @@
           </div>
         </section>
 
-        <section class="station-list-card">
+        <section class="station-list-card async-region is-loading" data-loading-region="list" aria-busy="true">
           <div class="control-head">
             <h2 id="stationListTitle">Estações</h2>
             <span id="listCount">-</span>
           </div>
-          <div class="station-list" id="stationList"></div>
+          <div class="station-list" id="stationList">
+            <div class="station-skeleton" aria-hidden="true"></div>
+            <div class="station-skeleton" aria-hidden="true"></div>
+            <div class="station-skeleton" aria-hidden="true"></div>
+            <div class="station-skeleton" aria-hidden="true"></div>
+          </div>
+          <button class="toolbar-button load-more-button" id="loadMoreStationsButton" type="button" hidden>Load more</button>
         </section>
       </aside>
 
-      <section class="map-stage">
+      <section class="map-stage async-region is-loading" data-loading-region="map" aria-busy="true">
         <div id="map"></div>
         <section class="floating-card selected-card" id="selectedCard">
           <span class="eyebrow" id="selectedStatusEyebrow">Status da data</span>
@@ -181,7 +192,7 @@
         </section>
       </section>
 
-      <aside class="detail-panel">
+      <aside class="detail-panel async-region" data-loading-region="station" aria-busy="false">
         <div class="tabbar">
           <button class="active" type="button" data-panel="stationPanel" id="stationTabButton">Estação</button>
           <button type="button" data-panel="datasetPanel" id="datasetTabButton">Conjunto</button>
@@ -340,7 +351,7 @@
             <ul class="qa-flags" id="qaFlags"></ul>
             <div class="qa-image-wrap">
               <div class="qa-image-shell" id="qaImageShell">
-                <img id="qaImage" alt="Painel QA da estação" hidden />
+                <img id="qaImage" alt="Painel QA da estação" loading="lazy" decoding="async" hidden />
               </div>
               <button class="toolbar-button image-expand-button" id="openQaImageButton" type="button" hidden>Ampliar figura</button>
               <p id="qaImageCaption" hidden>-</p>
@@ -427,8 +438,8 @@
               <p class="guide-step-note" id="guideNote" hidden></p>
             </div>
             <figure class="guide-visual-card" id="guideVisualCard">
-              <img class="guide-lockup" id="guideLockup" src="assets/limiar-lockup.svg" alt="LIMIAR" />
-              <img class="guide-visual-image" id="guideVisualImage" alt="" hidden />
+              <img class="guide-lockup" id="guideLockup" src="assets/limiar-lockup.svg" alt="LIMIAR" decoding="async" />
+              <img class="guide-visual-image" id="guideVisualImage" alt="" loading="lazy" decoding="async" hidden />
               <figcaption id="guideVisualCaption"></figcaption>
             </figure>
           </div>
@@ -458,7 +469,7 @@
       <section class="overlay-panel image-panel" role="dialog" aria-modal="true" aria-labelledby="imageOverlayTitle">
         <button class="overlay-close" id="closeImageButton" type="button" aria-label="Fechar">&times;</button>
         <h2 id="imageOverlayTitle">Painel hidráulico detalhado</h2>
-        <img id="imageOverlayImg" alt="Painel hidráulico ampliado" />
+        <img id="imageOverlayImg" alt="Painel hidráulico ampliado" loading="lazy" decoding="async" />
         <p id="imageOverlayCaption">-</p>
       </section>
     </div>
@@ -468,6 +479,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
   </body>
 </html>
