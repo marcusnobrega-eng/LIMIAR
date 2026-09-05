@@ -66,6 +66,10 @@ The website bundle published here is generated from the main research workspace 
 
 Production monitoring is optional and disabled by default. See [OBSERVABILITY.md](OBSERVABILITY.md) for the Sentry, Datadog, New Relic, and OpenTelemetry adapters and privacy constraints.
 
+## Development checks
+
+Install the pinned development tools with `npm ci`, then run `npm run lint`. The quality workflow checks JavaScript with Biome, unused dependencies with Knip, and dependency boundaries with ArchContract. Commit messages in pull requests follow Conventional Commits and are checked with Commitlint.
+
 In practice:
 
 - research processing happens in the main project workspace

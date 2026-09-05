@@ -1080,7 +1080,7 @@ const CURVE_COLORS = ['#2d1e3f', '#4f2a6b', '#72358c', '#98438a', '#bd537d', '#d
 const thresholdBandPlugin = {
   id: 'thresholdBand',
   beforeDatasetsDraw(chart, _args, options) {
-    if (!options || !options.enabled || !chart.scales?.y || !chart.chartArea) return;
+    if (!options?.enabled || !chart.scales?.y || !chart.chartArea) return;
     const { ctx, chartArea, scales } = chart;
     const low = Number(options.low);
     const high = Number(options.high);
@@ -1674,7 +1674,7 @@ function flagLabel(value) {
 
 function normalizeThresholdTriplet(alert, flood, severe) {
   let normalizedAlert = alert ?? null;
-  let normalizedFlood = flood ?? null;
+  const normalizedFlood = flood ?? null;
   let normalizedSevere = severe ?? null;
 
   if (normalizedFlood != null && normalizedAlert != null && normalizedAlert >= normalizedFlood) {
@@ -2869,7 +2869,9 @@ function renderStationCharts(stationData, eager = false) {
       observer.unobserve(item.target);
     });
   }, { rootMargin: '180px 0px' });
-  entries.forEach((entry) => state.chartObserver.observe(entry.canvas.closest('.chart-card')));
+  entries.forEach((entry) => {
+    state.chartObserver.observe(entry.canvas.closest('.chart-card'));
+  });
 }
 
 function renderTimeseriesChart(stationData) {
@@ -4533,7 +4535,9 @@ async function exportStationReport() {
     if (byId('timeseriesChart').hidden) {
       state.currentRange = 'full';
       forcedFullRange = true;
-      document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node.dataset.range === 'full'));
+      document.querySelectorAll('.range-button').forEach((node) => {
+        node.classList.toggle('active', node.dataset.range === 'full');
+      });
       renderTimeseriesChart(state.selectedData);
     }
     renderStationCharts(state.selectedData, true);
@@ -4800,7 +4804,9 @@ async function exportStationReport() {
   } finally {
     if (forcedFullRange) {
       state.currentRange = previousRange;
-      document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node.dataset.range === previousRange));
+      document.querySelectorAll('.range-button').forEach((node) => {
+        node.classList.toggle('active', node.dataset.range === previousRange);
+      });
       renderTimeseriesChart(state.selectedData);
     }
   }
@@ -4912,7 +4918,9 @@ function wireEvents() {
   document.querySelectorAll('.range-button').forEach((button) => {
     button.addEventListener('click', () => {
       state.currentRange = button.dataset.range;
-      document.querySelectorAll('.range-button').forEach((node) => node.classList.toggle('active', node === button));
+      document.querySelectorAll('.range-button').forEach((node) => {
+        node.classList.toggle('active', node === button);
+      });
       if (state.selectedData) {
         renderTimeseriesChart(state.selectedData);
         byId('timeseriesChart').closest('.chart-card')?.classList.remove('chart-pending');
@@ -4921,8 +4929,12 @@ function wireEvents() {
   });
   document.querySelectorAll('.tabbar button').forEach((button) => {
     button.addEventListener('click', () => {
-      document.querySelectorAll('.tabbar button').forEach((node) => node.classList.toggle('active', node === button));
-      document.querySelectorAll('.panel-view').forEach((panel) => panel.classList.toggle('active', panel.id === button.dataset.panel));
+      document.querySelectorAll('.tabbar button').forEach((node) => {
+        node.classList.toggle('active', node === button);
+      });
+      document.querySelectorAll('.panel-view').forEach((panel) => {
+        panel.classList.toggle('active', panel.id === button.dataset.panel);
+      });
     });
   });
 }
@@ -5002,7 +5014,9 @@ async function boot() {
 
 boot().catch((error) => {
   console.error(error);
-  ['summary', 'list', 'map', 'station'].forEach((name) => setRegionLoading(name, false));
+  ['summary', 'list', 'map', 'station'].forEach((name) => {
+    setRegionLoading(name, false);
+  });
   byId('appShell')?.setAttribute('aria-busy', 'false');
   completeAppProgress();
   showFatalState(error?.message || TEXT[state.lang].toasts.loadError, window.location.protocol === 'file:');

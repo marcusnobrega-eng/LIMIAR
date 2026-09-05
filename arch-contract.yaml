@@ -1,0 +1,25 @@
+version: 1
+project:
+  name: limiar-atlas
+
+layers:
+  - name: application
+    match: [app.js]
+  - name: observability
+    match: [observability.js]
+
+ruleset:
+  application:
+    mayDependOn: [observability]
+  observability:
+    mayDependOn: []
+
+expectations:
+  - name: observability-must-not-import-application
+    expect:
+      layer: observability
+    to:
+      notDependOnPaths: [app.js]
+
+agent:
+  updateDocs: [AGENTS.md]
