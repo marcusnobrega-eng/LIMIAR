@@ -24,6 +24,9 @@ These instructions apply to every coding agent and model working in this reposit
 - Do not commit tokens, DSNs, API keys, local paths, or personal data.
 - Use progressive loading and explicit loading, empty, success, and error states for asynchronous interfaces.
 - Apply purposeful motion only where it communicates state or spatial continuity. Respect `prefers-reduced-motion`.
+- For interface work, follow the [Design Motion Principles](https://github.com/kylezantos/design-motion-principles) skill when available. Use restrained, fast motion for this scientific productivity tool: emphasize state changes, avoid decorative movement during repeated actions, and animate only `transform`, `opacity`, or `filter` where possible.
+- Keep interface feedback below 300 ms for ordinary transitions. Long work must expose determinate progress when measurable and an honest indeterminate state otherwise.
+- Lazy-load maps, charts, and images that are outside the initial viewport. Use skeletons only where they preserve the shape of incoming content and always provide accessible busy states.
 - Add or update tests for behavior changes. Bug fixes require a regression test when the behavior can be automated.
 - Keep monitoring provider-neutral. Production observability must be optional and must not transmit station payloads.
 
