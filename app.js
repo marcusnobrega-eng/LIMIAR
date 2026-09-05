@@ -1077,7 +1077,84 @@ function crossSectionBand(stationData) {
   };
 }
 
-const CURVE_COLORS = ['#2d1e3f', '#4f2a6b', '#72358c', '#98438a', '#bd537d', '#de6b68', '#f08d5e', '#f7b267'];
+const CHART_THEME = {
+  text: '#23383f',
+  muted: '#66777d',
+  grid: 'rgba(35, 56, 63, 0.09)',
+  stage: '#155f78',
+  discharge: '#268b88',
+  alert: '#d89b2b',
+  flood: '#c54b3c',
+  severe: '#7a1f2b',
+  selected: '#17272d',
+};
+
+const CURVE_COLORS = ['#173f5f', '#20639b', '#3caea3', '#7f8c58', '#d49a35', '#d66a4a', '#a43d59', '#663a70'];
+
+function chartLegend({ display = true, position = 'bottom', filter } = {}) {
+  return {
+    display,
+    position,
+    align: 'start',
+    labels: {
+      boxWidth: 10,
+      boxHeight: 10,
+      color: CHART_THEME.muted,
+      padding: 14,
+      usePointStyle: true,
+      pointStyleWidth: 14,
+      font: { size: 11, weight: '500' },
+      ...(filter ? { filter } : {}),
+    },
+  };
+}
+
+function chartScale({ title, type, position, maxTicksLimit, beginAtZero, displayGrid = true, tickColor } = {}) {
+  return {
+    ...(type ? { type } : {}),
+    ...(position ? { position } : {}),
+    ...(beginAtZero !== undefined ? { beginAtZero } : {}),
+    ticks: {
+      color: tickColor || CHART_THEME.muted,
+      maxTicksLimit,
+      padding: 7,
+      font: { size: 11 },
+    },
+    grid: {
+      display: displayGrid,
+      color: CHART_THEME.grid,
+      tickLength: 0,
+      drawBorder: false,
+    },
+    border: { display: false },
+    ...(title ? {
+      title: {
+        display: true,
+        text: title,
+        color: CHART_THEME.text,
+        padding: { top: 8 },
+        font: { size: 12, weight: '600' },
+      },
+    } : {}),
+  };
+}
+
+function chartPlugins(extra = {}) {
+  return {
+    tooltip: {
+      backgroundColor: 'rgba(23, 39, 45, 0.94)',
+      titleColor: '#ffffff',
+      bodyColor: '#f3f7f5',
+      borderColor: 'rgba(255, 255, 255, 0.16)',
+      borderWidth: 1,
+      padding: 11,
+      cornerRadius: 8,
+      displayColors: true,
+      boxPadding: 4,
+    },
+    ...extra,
+  };
+}
 
 const thresholdBandPlugin = {
   id: 'thresholdBand',
@@ -1105,8 +1182,79 @@ const thresholdBandPlugin = {
   },
 };
 
+const thresholdLabelsPlugin = {
+  id: 'thresholdLabels',
+  afterDatasetsDraw(chart, _args, options) {
+    if (!options?.enabled || !chart.chartArea) return;
+    const labels = chart.data.datasets
+      .map((dataset, datasetIndex) => {
+        if (!dataset.thresholdLabel || dataset.hidden) return null;
+        const value = [...dataset.data].reverse().find((item) => item != null && Number.isFinite(Number(item)));
+        if (value == null) return null;
+        const meta = chart.getDatasetMeta(datasetIndex);
+        const scale = chart.scales[meta.yAxisID || 'y'];
+        if (!scale) return null;
+        return {
+          text: dataset.thresholdLabel,
+          color: dataset.borderColor,
+          y: scale.getPixelForValue(Number(value)),
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.y - right.y);
+    if (!labels.length) return;
+
+    const minimumGap = 18;
+    labels.forEach((label, index) => {
+      if (index && label.y - labels[index - 1].y < minimumGap) {
+        label.y = labels[index - 1].y + minimumGap;
+      }
+      label.y = Math.min(chart.chartArea.bottom - 8, Math.max(chart.chartArea.top + 8, label.y));
+    });
+
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.font = '600 10px "Source Sans 3", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    labels.forEach((label) => {
+      const width = ctx.measureText(label.text).width + 12;
+      const x = chartArea.right - 4;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.fillRect(x - width, label.y - 8, width, 16);
+      ctx.fillStyle = label.color;
+      ctx.fillText(label.text, x - 6, label.y);
+    });
+    ctx.restore();
+  },
+};
+
+const selectedDateLinePlugin = {
+  id: 'selectedDateLine',
+  afterDatasetsDraw(chart, _args, options) {
+    if (!options?.value || !chart.scales?.x || !chart.chartArea) return;
+    const x = chart.scales.x.getPixelForValue(options.value);
+    if (!Number.isFinite(x) || x < chart.chartArea.left || x > chart.chartArea.right) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(23, 39, 45, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
 if (window.Chart?.register) {
-  window.Chart.register(thresholdBandPlugin);
+  window.Chart.defaults.color = CHART_THEME.muted;
+  window.Chart.defaults.font.family = '"Source Sans 3", sans-serif';
+  window.Chart.defaults.font.size = 12;
+  window.Chart.defaults.elements.line.borderCapStyle = 'round';
+  window.Chart.defaults.elements.line.borderJoinStyle = 'round';
+  window.Chart.register(thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -2952,38 +3100,44 @@ function renderTimeseriesChart(stationData) {
         {
           label: thresholdTypeLabel(valueType),
           data: values,
-          borderColor: '#1F5E7A',
-          backgroundColor: 'rgba(31, 94, 122, 0.12)',
+          borderColor: CHART_THEME.stage,
+          backgroundColor: 'rgba(21, 95, 120, 0.10)',
           pointRadius: 0,
-          borderWidth: 2.1,
+          borderWidth: 2.35,
           tension: 0.12,
         },
         {
           label: text('fields').alert,
           data: alert,
-          borderColor: '#D89B2B',
+          borderColor: CHART_THEME.alert,
           pointRadius: 0,
           borderDash: [6, 4],
-          borderWidth: 1.6,
+          borderWidth: 1.8,
           stepped: true,
+          thresholdLabel: text('fields').alert,
+          directLabel: true,
         },
         {
           label: text('fields').flood,
           data: flood,
-          borderColor: '#C54B3C',
+          borderColor: CHART_THEME.flood,
           pointRadius: 0,
           borderDash: [4, 3],
-          borderWidth: 1.8,
+          borderWidth: 2,
           stepped: true,
+          thresholdLabel: text('fields').flood,
+          directLabel: true,
         },
         {
           label: text('fields').severe,
           data: severe,
-          borderColor: '#7A1F2B',
+          borderColor: CHART_THEME.severe,
           pointRadius: 0,
           borderDash: [2, 3],
-          borderWidth: 1.7,
+          borderWidth: 1.9,
           stepped: true,
+          thresholdLabel: text('fields').severe,
+          directLabel: true,
         },
         {
           label: text('fields').selectedDate,
@@ -2991,7 +3145,7 @@ function renderTimeseriesChart(stationData) {
           data: highlightValue === undefined ? [] : [{ x: state.selectedDate, y: highlightValue }],
           pointRadius: 5,
           pointHoverRadius: 5,
-          pointBackgroundColor: '#111',
+          pointBackgroundColor: CHART_THEME.selected,
           pointBorderColor: '#fff',
           pointBorderWidth: 1.5,
         },
@@ -3001,10 +3155,10 @@ function renderTimeseriesChart(stationData) {
             : `Estimated discharge from the latest rating curve (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`,
           data: derivedDischarge,
           yAxisID: 'yDischarge',
-          borderColor: '#2E8B8B',
+          borderColor: CHART_THEME.discharge,
           backgroundColor: 'rgba(46, 139, 139, 0.1)',
           pointRadius: 0,
-          borderWidth: 1.8,
+          borderWidth: 2,
           borderDash: [8, 4],
           tension: 0.08,
           spanGaps: true,
@@ -3017,35 +3171,28 @@ function renderTimeseriesChart(stationData) {
       maintainAspectRatio: false,
       normalized: true,
       interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: {
-          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
-        },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#5b6a71', maxTicksLimit: 8 },
-          grid: { color: 'rgba(0,0,0,0.05)' },
-        },
-        y: {
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          title: {
-            display: true,
-            text: TEXT[state.lang].units[valueType],
-            color: '#42545c',
+      layout: { padding: { top: 4 } },
+      plugins: chartPlugins({
+        legend: chartLegend({
+          filter(item, data) {
+            return data.datasets[item.datasetIndex]?.directLabel !== true;
           },
-        },
+        }),
+        thresholdLabels: { enabled: true },
+        selectedDateLine: { value: state.selectedDate },
+      }),
+      scales: {
+        x: chartScale({ maxTicksLimit: 8 }),
+        y: chartScale({ title: TEXT[state.lang].units[valueType] }),
         ...(latestCurve && hasDerivedDischarge ? {
           yDischarge: {
-            position: 'right',
-            ticks: { color: '#2E8B8B' },
+            ...chartScale({
+              title: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)',
+              position: 'right',
+              tickColor: CHART_THEME.discharge,
+            }),
             grid: { drawOnChartArea: false },
-            title: {
-              display: true,
-              text: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)',
-              color: '#2E8B8B',
-            },
+            title: { display: true, text: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)', color: CHART_THEME.discharge, font: { size: 12, weight: '600' } },
           },
         } : {}),
       },
@@ -3105,8 +3252,8 @@ function renderCrossSectionChart(stationData) {
           showLine: true,
           pointRadius: 0,
           tension: 0,
-          borderColor: isLatest ? '#D04B45' : (isOldest ? '#2E8B8B' : `rgb(${grayValue}, ${grayValue}, ${grayValue})`),
-          borderWidth: isLatest ? 3 : (isOldest ? 2.4 : 1.5),
+          borderColor: isLatest ? CHART_THEME.flood : (isOldest ? CHART_THEME.discharge : `rgb(${grayValue}, ${grayValue}, ${grayValue})`),
+          borderWidth: isLatest ? 3.2 : (isOldest ? 2.5 : 1.35),
           borderCapStyle: 'round',
           order: isLatest ? 99 : index,
           showInLegend: sections.length === 1 || isLatest || isOldest,
@@ -3118,46 +3265,24 @@ function renderCrossSectionChart(stationData) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'nearest' },
-      plugins: {
+      plugins: chartPlugins({
         thresholdBand: {
           enabled: !!band,
           low: band?.low,
           median: band?.median,
           high: band?.high,
         },
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: {
-            boxWidth: 12,
-            boxHeight: 12,
-            color: '#42545c',
-            filter(item, data) {
-              return data.datasets[item.datasetIndex]?.showInLegend !== false;
-            },
+        legend: chartLegend({
+          filter(item, data) {
+            return data.datasets[item.datasetIndex]?.showInLegend !== false;
           },
-        },
-      },
+        }),
+      }),
       scales: {
         x: {
-          type: 'linear',
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          title: {
-            display: true,
-            text: state.lang === 'pt' ? 'Distância da seção (m)' : 'Cross-section distance (m)',
-            color: '#42545c',
-          },
+          ...chartScale({ title: state.lang === 'pt' ? 'Distância da seção (m)' : 'Cross-section distance (m)', type: 'linear' }),
         },
-        y: {
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          title: {
-            display: true,
-            text: state.lang === 'pt' ? 'Cota/elevação (cm)' : 'Stage/elevation (cm)',
-            color: '#42545c',
-          },
-        },
+        y: chartScale({ title: state.lang === 'pt' ? 'Cota/elevação (cm)' : 'Stage/elevation (cm)' }),
       },
     },
   });
@@ -3204,28 +3329,31 @@ function renderDynamicDailyChart(stationData) {
         {
           label: thresholdTypeLabel(valueType),
           data: values,
-          borderColor: '#5c5c5c',
+          borderColor: CHART_THEME.stage,
           pointRadius: 0,
-          borderWidth: 1,
+          borderWidth: 1.35,
           tension: 0,
         },
         {
           label: text('fields').flood,
           data: flood,
-          borderColor: '#111111',
-          borderWidth: 1.6,
+          borderColor: CHART_THEME.flood,
+          borderWidth: 2,
           stepped: true,
           pointRadius: 0,
           spanGaps: true,
+          thresholdLabel: text('fields').flood,
+          directLabel: true,
         },
         {
           label: state.lang === 'pt' ? 'Picos reconstruídos' : 'Reconstructed peaks',
           type: 'scatter',
           data: peaks,
-          pointRadius: 2.2,
-          pointHoverRadius: 3.2,
-          pointBackgroundColor: '#9b1d20',
-          pointBorderWidth: 0,
+          pointRadius: 2.5,
+          pointHoverRadius: 4,
+          pointBackgroundColor: CHART_THEME.severe,
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 0.8,
         },
       ],
     },
@@ -3234,26 +3362,17 @@ function renderDynamicDailyChart(stationData) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
-        },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#5b6a71', maxTicksLimit: 7 },
-          grid: { color: 'rgba(0,0,0,0.05)' },
-        },
-        y: {
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          title: {
-            display: true,
-            text: TEXT[state.lang].units[valueType],
-            color: '#42545c',
+      plugins: chartPlugins({
+        legend: chartLegend({
+          filter(item, data) {
+            return data.datasets[item.datasetIndex]?.directLabel !== true;
           },
-        },
+        }),
+        thresholdLabels: { enabled: true },
+      }),
+      scales: {
+        x: chartScale({ maxTicksLimit: 7 }),
+        y: chartScale({ title: TEXT[state.lang].units[valueType] }),
       },
     },
   });
@@ -3294,7 +3413,7 @@ function renderRatingCurveChart(stationData) {
       showLine: true,
       pointRadius: 0,
       tension: 0,
-      borderWidth: 1.4,
+      borderWidth: 1.75,
       borderColor: colorByYear.get(curve.year) || '#5e2b83',
     };
   }).filter(Boolean);
@@ -3340,7 +3459,7 @@ function renderRatingCurveChart(stationData) {
       parsing: false,
       showLine: true,
       pointRadius: 0,
-      borderWidth: 1.3,
+      borderWidth: 1.65,
       borderDash: [7, 4],
       borderColor: '#202020',
     });
@@ -3412,32 +3531,10 @@ function renderRatingCurveChart(stationData) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'nearest' },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
-        },
-      },
+      plugins: chartPlugins({ legend: chartLegend() }),
       scales: {
-        x: {
-          type: 'logarithmic',
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          title: {
-            display: true,
-            text: state.lang === 'pt' ? 'Vazão (m³/s)' : 'Discharge (m³/s)',
-            color: '#42545c',
-          },
-        },
-        y: {
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          title: {
-            display: true,
-            text: state.lang === 'pt' ? 'Cota (cm)' : 'Stage (cm)',
-            color: '#42545c',
-          },
-        },
+        x: chartScale({ title: state.lang === 'pt' ? 'Vazão (m³/s)' : 'Discharge (m³/s)', type: 'logarithmic' }),
+        y: chartScale({ title: state.lang === 'pt' ? 'Cota (cm)' : 'Stage (cm)' }),
       },
     },
   });
@@ -3465,41 +3562,47 @@ function renderEvidenceChart(stationData) {
       type: 'bar',
       label: state.lang === 'pt' ? 'Máximos anuais' : 'Annual maxima',
       data: context.annual,
-      backgroundColor: 'rgba(31, 94, 122, 0.52)',
-      borderColor: '#1F5E7A',
-      borderWidth: 1,
-      borderRadius: 5,
+      backgroundColor: 'rgba(21, 95, 120, 0.38)',
+      borderColor: CHART_THEME.stage,
+      borderWidth: 1.1,
+      borderRadius: 3,
       borderSkipped: false,
     },
     {
       type: 'line',
       label: text('fields').alert,
       data: context.alert,
-      borderColor: '#D89B2B',
+      borderColor: CHART_THEME.alert,
       borderDash: [6, 4],
-      borderWidth: 1.7,
+      borderWidth: 1.8,
       pointRadius: 0,
       spanGaps: true,
+      thresholdLabel: text('fields').alert,
+      directLabel: true,
     },
     {
       type: 'line',
       label: text('fields').flood,
       data: context.flood,
-      borderColor: '#C54B3C',
+      borderColor: CHART_THEME.flood,
       borderDash: [4, 3],
       borderWidth: 2,
       pointRadius: 0,
       spanGaps: true,
+      thresholdLabel: text('fields').flood,
+      directLabel: true,
     },
     {
       type: 'line',
       label: text('fields').severe,
       data: context.severe,
-      borderColor: '#7A1F2B',
+      borderColor: CHART_THEME.severe,
       borderDash: [2, 3],
-      borderWidth: 1.8,
+      borderWidth: 1.9,
       pointRadius: 0,
       spanGaps: true,
+      thresholdLabel: text('fields').severe,
+      directLabel: true,
     },
   ];
   if (context.q2.some((value) => value != null)) {
@@ -3507,7 +3610,7 @@ function renderEvidenceChart(stationData) {
       type: 'line',
       label: 'Q2',
       data: context.q2,
-      borderColor: '#67A9C6',
+      borderColor: '#73a9bc',
       borderDash: [8, 4],
       borderWidth: 1.6,
       pointRadius: 0,
@@ -3518,10 +3621,10 @@ function renderEvidenceChart(stationData) {
     type: 'line',
     label: state.lang === 'pt' ? 'Atualização de seção' : 'Cross-section update',
     data: context.crossSections,
-    borderColor: '#2E8B8B',
+    borderColor: CHART_THEME.discharge,
     backgroundColor: '#F7F2E7',
     pointBackgroundColor: '#F7F2E7',
-    pointBorderColor: '#2E8B8B',
+    pointBorderColor: CHART_THEME.discharge,
     pointBorderWidth: 2,
     pointRadius: 4.5,
     pointHoverRadius: 4.5,
@@ -3539,26 +3642,17 @@ function renderEvidenceChart(stationData) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: {
-          labels: { boxWidth: 12, boxHeight: 12, color: '#42545c' },
-        },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#5b6a71', maxTicksLimit: 9 },
-          grid: { display: false },
-        },
-        y: {
-          beginAtZero: false,
-          ticks: { color: '#5b6a71' },
-          grid: { color: 'rgba(0,0,0,0.06)' },
-          title: {
-            display: true,
-            text: TEXT[state.lang].units[stationData.summary.threshold_value_type],
-            color: '#42545c',
+      plugins: chartPlugins({
+        legend: chartLegend({
+          filter(item, data) {
+            return data.datasets[item.datasetIndex]?.directLabel !== true;
           },
-        },
+        }),
+        thresholdLabels: { enabled: true },
+      }),
+      scales: {
+        x: chartScale({ maxTicksLimit: 9, displayGrid: false }),
+        y: chartScale({ title: TEXT[state.lang].units[stationData.summary.threshold_value_type] }),
       },
     },
   });
@@ -3602,8 +3696,9 @@ function renderSeasonality(stationData) {
         {
           label: state.lang === 'pt' ? 'Mês do pico' : 'Peak month',
           data: seasonality.peakCounts,
-          backgroundColor: 'rgba(31, 94, 122, 0.72)',
-          borderRadius: 8,
+          backgroundColor: CHART_THEME.stage,
+          hoverBackgroundColor: CHART_THEME.discharge,
+          borderRadius: 4,
           borderSkipped: false,
         },
       ],
@@ -3612,23 +3707,12 @@ function renderSeasonality(stationData) {
       animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          labels: { color: '#42545c', boxWidth: 12, boxHeight: 12 },
-        },
-      },
+      plugins: chartPlugins({ legend: chartLegend({ display: false }) }),
       scales: {
-        x: {
-          ticks: { color: '#5b6a71' },
-          grid: { display: false },
-        },
+        x: chartScale({ displayGrid: false }),
         y: {
-          beginAtZero: true,
-          ticks: {
-            color: '#5b6a71',
-            precision: 0,
-          },
-          grid: { color: 'rgba(0,0,0,0.06)' },
+          ...chartScale({ beginAtZero: true }),
+          ticks: { color: CHART_THEME.muted, precision: 0, padding: 7, font: { size: 11 } },
         },
       },
     },
