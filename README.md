@@ -1,8 +1,8 @@
 # LIMIAR
 
-LIMIAR is a static public atlas for exploring reconstructed flood signals at ANA gauge stations across Brazil.
+LIMIAR is a static public interface for exploring reconstructed flood signals at ANA gauge stations across Brazil.
 
-The website publishes a browser-ready bundle with precomputed station data, daily status summaries, hydraulic context, and station-level diagnostic panels. It is intended for historical analysis, screening, communication, and hypothesis generation, not for operational real-time warning.
+The website publishes a browser-ready bundle with precomputed station data, daily status summaries, hydraulic context, and station-level evidence panels. It supports historical analysis, scientific communication, and hypothesis development, not operational real-time warning.
 
 ## Website
 
@@ -24,7 +24,7 @@ Main contents:
 - `vendor/`: third-party browser libraries bundled with the site
 - `data/`: prebuilt station and daily status assets consumed by the frontend
 
-## What the atlas lets you do
+## What LIMIAR lets you do
 
 - search stations by date, name, code, UF, basin, biome, and recommended-use class
 - view daily station condition on the national map
@@ -32,7 +32,7 @@ Main contents:
 - explore time series, dynamic thresholds, annual maxima, cross sections, and rating-curve context
 - export station-level summaries and CSV outputs from the web interface
 
-## Status logic shown in the atlas
+## Status logic shown in LIMIAR
 
 Daily station classes are derived from precomputed thresholds and cached daily values:
 
@@ -45,12 +45,12 @@ Daily station classes are derived from precomputed thresholds and cached daily v
 Threshold basis is exposed in the interface so users can distinguish between:
 
 - observed hydraulic evidence
-- Q2 fallback cases
+- stations using Q2 thresholds
 - alert and severe statistical thresholds
 
 ## Important interpretation note
 
-LIMIAR is a historical and screening-oriented product. It should not be interpreted as an official warning platform or as a substitute for local validation, field review, or operational flood forecasting systems.
+LIMIAR presents historical records for analysis and communication. It should not be interpreted as an official warning platform or as a substitute for local validation, field review, or operational flood forecasting systems.
 
 ## Published data snapshot
 

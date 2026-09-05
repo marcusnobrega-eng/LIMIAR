@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=14" />
+    <link rel="stylesheet" href="styles.css?v=15" />
   </head>
   <body class="app-loading">
     <header class="topbar">
@@ -24,15 +24,23 @@
       <div class="topbar-controls">
         <div class="date-navigator" role="group" aria-labelledby="dateLabel">
           <button class="date-step-button" id="prevDateButton" type="button" aria-label="Previous day" title="Previous day">
-            <span aria-hidden="true">&larr;</span>
+            <span aria-hidden="true">&#8249;</span>
           </button>
           <label class="date-control">
-            <span id="dateLabel">Date</span>
-            <input id="datePicker" type="date" />
-            <input id="dateScrubber" class="date-scrubber" type="range" min="0" max="0" value="0" step="1" aria-label="Date scrubber" />
+            <span class="date-control-heading" id="dateLabel">Date</span>
+            <span class="date-picker-row">
+              <input id="datePicker" type="date" />
+            </span>
+            <span class="date-timeline">
+              <input id="dateScrubber" class="date-scrubber" type="range" min="0" max="0" value="0" step="1" aria-label="Date scrubber" />
+              <span class="date-timeline-limits" aria-hidden="true">
+                <span id="dateTimelineStart">1911</span>
+                <span id="dateTimelineEnd">2025</span>
+              </span>
+            </span>
           </label>
           <button class="date-step-button" id="nextDateButton" type="button" aria-label="Next day" title="Next day">
-            <span aria-hidden="true">&rarr;</span>
+            <span aria-hidden="true">&#8250;</span>
           </button>
         </div>
         <div class="language-switch" role="group" aria-label="Language">
@@ -46,23 +54,31 @@
           </button>
         </div>
         <button class="toolbar-button" id="theoryButton" type="button">How it works</button>
-        <button class="toolbar-button" id="layersButton" type="button">Camadas</button>
-        <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
-        <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
-        <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
+        <details class="actions-menu" id="actionsMenu">
+          <summary aria-label="Actions">
+            <span class="actions-menu-label" id="actionsMenuLabel">Actions</span>
+            <span class="actions-menu-icon" aria-hidden="true">•••</span>
+          </summary>
+          <div class="actions-menu-panel">
+            <button class="toolbar-button" id="layersButton" type="button">Camadas</button>
+            <button class="toolbar-button" id="fitMapButton" type="button">Ajustar mapa</button>
+            <button class="toolbar-button" id="exportCsvButton" type="button">Exportar CSV</button>
+            <button class="toolbar-button" id="shareButton" type="button">Compartilhar</button>
+          </div>
+        </details>
       </div>
     </header>
 
-    <div class="app-progress" id="appProgress" role="progressbar" aria-label="Loading atlas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="app-progress" id="appProgress" role="progressbar" aria-label="Loading LIMIAR" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <span class="app-progress-track"><span id="appProgressBar"></span></span>
-      <strong id="appProgressLabel" aria-live="polite">Loading atlas...</strong>
+      <strong id="appProgressLabel" aria-live="polite">Loading LIMIAR...</strong>
     </div>
 
     <main class="app-shell" id="appShell" aria-busy="true">
       <aside class="sidebar">
         <section class="hero-card">
-          <span class="eyebrow" id="eyebrowLabel">Atlas histórico e de triagem</span>
-          <h1 id="heroTitle">Busca diária de estações com sinais de inundação</h1>
+          <span class="eyebrow" id="eyebrowLabel">Reconstrução histórica de inundações</span>
+          <h1 id="heroTitle">Condições de inundação por estação e data</h1>
           <p id="heroText">
             Selecione uma data para ver quais estações estão em condição normal, em alerta, inundadas ou em inundação extrema.
           </p>
@@ -70,7 +86,7 @@
 
         <section class="fatal-card" id="fatalState" hidden>
           <h2 id="fatalTitle">Erro de carregamento</h2>
-          <p id="fatalMessage">Não foi possível carregar os arquivos do atlas.</p>
+          <p id="fatalMessage">Não foi possível carregar os arquivos do LIMIAR.</p>
           <pre id="fatalCommand" hidden>python3 -m http.server 8000</pre>
         </section>
 
@@ -195,7 +211,7 @@
       <aside class="detail-panel async-region" data-loading-region="station" aria-busy="false">
         <div class="tabbar">
           <button class="active" type="button" data-panel="stationPanel" id="stationTabButton">Estação</button>
-          <button type="button" data-panel="datasetPanel" id="datasetTabButton">Conjunto</button>
+          <button type="button" data-panel="datasetPanel" id="datasetTabButton">Visão nacional</button>
         </div>
 
         <section id="stationPanel" class="panel-view active">
@@ -403,7 +419,7 @@
               <h3 id="howToReadTitle">Como interpretar</h3>
             </div>
             <p id="howToReadText">
-              O atlas distingue limiares hidráulicos observados de limiares Q2 de alta vazão. Os estados de alerta e severidade usam retornos estatísticos quando disponíveis.
+              O LIMIAR distingue limiares hidráulicos observados de limiares Q2 de alta vazão. Os estados de alerta e severidade usam retornos estatísticos quando disponíveis.
             </p>
           </section>
 
@@ -412,7 +428,7 @@
               <h3 id="caveatTitle">Caveat científico</h3>
             </div>
             <p id="caveatText">
-              Este atlas mostra um retrato histórico para análise. Não é um sistema de alerta em tempo real e não substitui a avaliação local.
+              O LIMIAR apresenta registros históricos para análise. Não é um sistema de alerta em tempo real e não substitui a avaliação local.
             </p>
           </section>
         </section>
@@ -431,7 +447,7 @@
           <div class="guide-content">
             <div class="guide-copy">
               <span class="eyebrow guide-eyebrow" id="guideEyebrow">O que é o LIMIAR</span>
-              <h2 id="guideTitle" tabindex="-1">Um atlas histórico para entender sinais de inundação</h2>
+              <h2 id="guideTitle" tabindex="-1">Registros históricos para entender sinais de inundação</h2>
               <p class="guide-text" id="guideText"></p>
               <div class="guide-highlight-grid" id="guideHighlights"></div>
               <div class="guide-class-grid" id="guideClasses" hidden></div>
@@ -444,7 +460,7 @@
             </figure>
           </div>
           <div class="guide-footer">
-            <button class="toolbar-button guide-tertiary" id="guideSkipButton" type="button">Pular para o atlas</button>
+            <button class="toolbar-button guide-tertiary" id="guideSkipButton" type="button">Ir para o LIMIAR</button>
             <div class="guide-footer-nav">
               <button class="toolbar-button" id="guidePrevButton" type="button">Voltar</button>
               <button class="toolbar-button guide-primary" id="guideNextButton" type="button">Próximo</button>
@@ -483,6 +499,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
   </body>
 </html>
