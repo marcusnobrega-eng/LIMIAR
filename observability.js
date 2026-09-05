@@ -1,6 +1,4 @@
 (function setupLimiarObservability() {
-  'use strict';
-
   const config = Object.assign({
     enabled: false,
     environment: 'production',

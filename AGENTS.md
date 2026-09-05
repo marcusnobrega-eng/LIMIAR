@@ -35,6 +35,7 @@ These instructions apply to every coding agent and model working in this reposit
 - The Issue and acceptance criteria are current.
 - The branch contains only work required by the Issue.
 - Formatting, linting, architecture checks, tests, and end-to-end tests pass when applicable.
+- `npm run lint` and `npm run lint:commits` pass for code changes.
 - Desktop and mobile behavior were checked.
 - Reduced-motion behavior was checked when motion changed.
 - The PR description contains a closing reference to its Issue.
