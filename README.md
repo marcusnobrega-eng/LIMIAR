@@ -18,6 +18,7 @@ Main contents:
 
 - `index.html`: static site entry point
 - `app.js`: client-side application logic
+- `core.js`: tested numerical helpers used by the application
 - `styles.css`: site styling
 - `observability.js`: optional provider-neutral browser observability adapter
 - `assets/`: logo and published QA panel images
@@ -68,7 +69,14 @@ Production monitoring is optional and disabled by default. See [OBSERVABILITY.md
 
 ## Development checks
 
-Install the pinned development tools with `npm ci`, then run `npm run lint`. The quality workflow checks JavaScript with Biome, unused dependencies with Knip, and dependency boundaries with ArchContract. Commit messages in pull requests follow Conventional Commits and are checked with Commitlint.
+Install the pinned development tools with `npm ci`, then run `npm run lint` and `npm test`. The quality workflow checks JavaScript with Biome, unused dependencies with Knip, and dependency boundaries with ArchContract. Vitest covers numerical and integration behavior, Playwright exercises the published interface on desktop and mobile, Codecov records coverage, and Stryker can assess the strength of the numerical tests with `npm run test:mutation`. Commit messages in pull requests follow Conventional Commits and are checked with Commitlint.
+
+Useful commands:
+
+- `npm run lint`: code quality and architecture checks
+- `npm test`: unit and integration tests with coverage
+- `npm run test:e2e`: browser tests against a temporary local server
+- `npm run test:mutation`: mutation testing for the shared numerical helpers
 
 In practice:
 

@@ -1,3 +1,11 @@
+import {
+  addDays,
+  normalizeThresholdTriplet,
+  quantileFromSorted,
+  ratingDischarge,
+  ratingStageFromDischarge,
+} from './core.js';
+
 const STATUS_MAP = {
   n: 'normal',
   w: 'warning',
@@ -1020,35 +1028,6 @@ function curveKey(curveId, segmentId) {
   return `${curveId || ''}||${segmentId || ''}`;
 }
 
-function quantileFromSorted(values, q) {
-  if (!values.length) return null;
-  if (values.length === 1) return values[0];
-  const pos = (values.length - 1) * q;
-  const base = Math.floor(pos);
-  const rest = pos - base;
-  const lower = values[base];
-  const upper = values[Math.min(base + 1, values.length - 1)];
-  return lower + rest * (upper - lower);
-}
-
-function ratingDischarge(stageCm, coefficientA, coefficientH0, coefficientN) {
-  const stageM = Number(stageCm) / 100;
-  const baseM = stageM - Number(coefficientH0);
-  if (!Number.isFinite(baseM) || baseM <= 0 || !Number.isFinite(Number(coefficientA)) || !Number.isFinite(Number(coefficientN))) {
-    return null;
-  }
-  return Number(coefficientA) * (baseM ** Number(coefficientN));
-}
-
-function ratingStageFromDischarge(dischargeM3s, coefficientA, coefficientH0, coefficientN) {
-  const discharge = Number(dischargeM3s);
-  if (discharge <= 0 || !Number.isFinite(discharge) || !Number.isFinite(Number(coefficientA)) || Number(coefficientA) <= 0 || !Number.isFinite(Number(coefficientN)) || Number(coefficientN) <= 0) {
-    return null;
-  }
-  const stageM = Number(coefficientH0) + ((discharge / Number(coefficientA)) ** (1 / Number(coefficientN)));
-  return stageM * 100;
-}
-
 function latestRatingCurve(stationData) {
   const curves = (stationData.hydraulic?.ratingCurves || []).filter((curve) =>
     curve
@@ -1820,27 +1799,6 @@ function flagLevelClass(value) {
 function flagLabel(value) {
   if (!value) return '-';
   return QA_FLAG_TEXT[value]?.[state.lang] || humanizeToken(value);
-}
-
-function normalizeThresholdTriplet(alert, flood, severe) {
-  let normalizedAlert = alert ?? null;
-  const normalizedFlood = flood ?? null;
-  let normalizedSevere = severe ?? null;
-
-  if (normalizedFlood != null && normalizedAlert != null && normalizedAlert >= normalizedFlood) {
-    normalizedAlert = null;
-  }
-  if (normalizedFlood != null && normalizedSevere != null && normalizedSevere <= normalizedFlood) {
-    normalizedSevere = null;
-  }
-  if (normalizedAlert != null && normalizedSevere != null && normalizedSevere <= normalizedAlert) {
-    normalizedSevere = null;
-  }
-  return {
-    alert: normalizedAlert,
-    flood: normalizedFlood,
-    severe: normalizedSevere,
-  };
 }
 
 function eventClassLabel(event) {
@@ -2686,12 +2644,6 @@ function renderDatasetMetrics() {
       [TEXT[state.lang].datasetNarratives.geographyTitle, geographyNarrative],
     ].map(([title, body]) => `<article><h4>${title}</h4><p>${body}</p></article>`).join('');
   }
-}
-
-function addDays(dateString, offset) {
-  const date = new Date(`${dateString}T00:00:00`);
-  date.setDate(date.getDate() + Number(offset));
-  return date.toISOString().slice(0, 10);
 }
 
 function utcDayNumber(dateString) {

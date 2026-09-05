@@ -1,21 +1,33 @@
 {
-  "name": "limiar-atlas",
+  "name": "limiar-web",
   "version": "1.0.0",
   "private": true,
-  "description": "Static public atlas for reconstructed flood signals in Brazil",
+  "type": "module",
+  "description": "Static public interface for reconstructed flood signals in Brazil",
   "scripts": {
     "lint": "npm run lint:biome && npm run lint:deps && npm run lint:arch",
-    "lint:biome": "biome lint app.js observability.js",
+    "lint:biome": "biome lint app.js core.js observability.js tests",
     "lint:deps": "knip",
     "lint:arch": "arch-contract check --config arch-contract.yaml",
-    "lint:commits": "commitlint --from origin/main --to HEAD --verbose"
+    "lint:commits": "commitlint --from origin/main --to HEAD --verbose",
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:mutation": "stryker run"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
     "@commitlint/cli": "21.2.2",
     "@commitlint/config-conventional": "21.2.2",
+    "@playwright/test": "1.63.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@vitest/coverage-v8": "4.1.11",
     "arch-contract": "0.3.0",
-    "knip": "6.34.0"
+    "jsdom": "30.0.1",
+    "knip": "6.34.0",
+    "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=22"

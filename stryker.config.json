@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": ["core.js"],
+  "testRunner": "vitest",
+  "vitest": {
+    "related": false
+  },
+  "coverageAnalysis": "perTest",
+  "reporters": ["clear-text", "progress"],
+  "thresholds": {
+    "high": 85,
+    "low": 70,
+    "break": 65
+  }
+}

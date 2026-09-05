@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 132" role="img" aria-labelledby="title desc">
   <title id="title">LIMIAR logo</title>
-  <desc id="desc">Layered emblem combining an atlas frame, river valley, threshold line, and highlighted water level.</desc>
+  <desc id="desc">Layered emblem combining a geographic frame, river valley, threshold line, and highlighted water level.</desc>
   <defs>
     <linearGradient id="shieldFill" x1="18%" y1="8%" x2="82%" y2="92%">
       <stop offset="0%" stop-color="#3B90A0" />

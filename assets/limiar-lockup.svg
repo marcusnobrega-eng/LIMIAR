@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 280" role="img" aria-labelledby="title desc">
   <title id="title">LIMIAR lockup</title>
-  <desc id="desc">LIMIAR wordmark with the new atlas-river-threshold emblem.</desc>
+  <desc id="desc">LIMIAR wordmark with the river-threshold emblem.</desc>
   <defs>
     <linearGradient id="shieldFill" x1="18%" y1="8%" x2="82%" y2="92%">
       <stop offset="0%" stop-color="#3B90A0" />
