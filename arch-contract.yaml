@@ -1,6 +1,6 @@
 version: 1
 project:
-  name: limiar-atlas
+  name: limiar-web
 
 layers:
   - name: application
