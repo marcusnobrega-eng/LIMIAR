@@ -1,6 +1,6 @@
 # LIMIAR Observability
 
-Observability is optional and disabled by default. The public atlas works without a monitoring account, cookies, tokens, or telemetry requests.
+Observability is optional and disabled by default. The public LIMIAR interface works without a monitoring account, cookies, tokens, or telemetry requests.
 
 ## Supported providers
 

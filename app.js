@@ -62,9 +62,10 @@ const TEXT = {
     fitMapButton: 'Ajustar mapa',
     exportCsvButton: 'Exportar CSV',
     shareButton: 'Compartilhar',
-    eyebrowLabel: 'Atlas histórico e de triagem',
-    heroTitle: 'Busca diária de estações com sinais de inundação',
-    heroText: 'Selecione uma data para ver quais estações estão em condição normal, em alerta, inundadas ou em inundação extrema.',
+    actionsMenuLabel: 'Ações',
+    eyebrowLabel: 'Reconstrução histórica de inundações',
+    heroTitle: 'Condições de inundação por estação e data',
+    heroText: 'Escolha uma data para consultar estações em condição normal, alerta, inundação ou inundação extrema.',
     statStationsLabel: 'Estações publicadas',
     statRangeLabel: 'Período',
     statLatestLabel: 'Última data',
@@ -88,7 +89,7 @@ const TEXT = {
     selectedMetricQaLabel: 'Incerteza',
     legendTitle: 'Legenda',
     stationTabButton: 'Estação',
-    datasetTabButton: 'Conjunto',
+    datasetTabButton: 'Visão nacional',
     stationHeading: 'Estação',
     stationSubheading: 'Nenhuma estação selecionada',
     exportStationDataButton: 'Baixar dados CSV',
@@ -120,17 +121,17 @@ const TEXT = {
     statusTotalsTitle: 'Totais da data selecionada',
     datasetBreakdownTitle: 'Cobertura e distribuição',
     howToReadTitle: 'Como interpretar',
-    howToReadText: 'O mapa usa primeiro limiares hidráulicos observados. Onde eles não existem, o atlas usa Q2 estatístico. Alerta e inundação severa usam limiares estatísticos de período de retorno.',
+    howToReadText: 'O mapa prioriza limiares hidráulicos observados. Nas estações sem esse limiar, o LIMIAR usa Q2 estatístico. Alerta e inundação severa usam limiares estatísticos de período de retorno.',
     thStartDate: 'Início',
-    caveatTitle: 'Caveat científico',
-    caveatText: 'Este atlas mostra um retrato histórico para análise. Não é um sistema de alerta em tempo real e não substitui a avaliação local.',
+    caveatTitle: 'Limites de uso',
+    caveatText: 'O LIMIAR apresenta registros históricos para análise. Não é um sistema de alerta em tempo real e não substitui a avaliação local.',
     thPeakDate: 'Data de pico',
     thDuration: 'Duração',
     thPeak: 'Pico',
     thClass: 'Classe',
     visibleStations: 'visíveis',
     loadMoreStations: 'Carregar mais',
-    loadingAtlas: 'Carregando o atlas...',
+    loadingAtlas: 'Carregando o LIMIAR...',
     loadingDate: 'Carregando a data...',
     loadingStation: 'Carregando a estação...',
     fullRecordLabel: 'Registro completo',
@@ -161,7 +162,7 @@ const TEXT = {
     imageExpandButton: 'Ampliar figura',
     imageOverlayTitle: 'Painel hidráulico detalhado',
     closeLabel: 'Fechar',
-    fatalTitle: 'Falha ao carregar o atlas',
+    fatalTitle: 'Falha ao carregar o LIMIAR',
     fatalMessage: 'Abra este site por um servidor local para que os arquivos de dados possam ser lidos.',
     fatalCommandLabel: 'No terminal, dentro da pasta github/LIMIAR, rode:',
     status: {
@@ -222,7 +223,7 @@ const TEXT = {
       meanDuration: 'Duração média',
       durationStd: 'Desvio-padrão da duração',
       hydraulicStations: 'Com limiar hidráulico',
-      q2FallbackStations: 'Com fallback Q2',
+      q2FallbackStations: 'Com limiar Q2',
       crossSectionStations: 'Com seção transversal',
       ratingCurveStations: 'Com curva-chave',
       totalEvents: 'Eventos reconstruídos',
@@ -246,7 +247,7 @@ const TEXT = {
       title: 'Relatório técnico da estação',
       summarySection: 'Resumo da estação',
       methodSection: 'Como interpretar esta estação',
-      methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. Quando existe evidência hidráulica observada, ela define o limiar principal de inundação; quando não existe, o atlas usa o Q2 estatístico como fallback. Este produto é histórico e de triagem, não um sistema operacional em tempo real.',
+      methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. A evidência hidráulica observada define o limiar principal quando disponível. Nas demais estações, o Q2 estatístico define o limiar. O sistema apresenta registros históricos e não opera alertas em tempo real.',
       statusSection: 'Situação na data selecionada',
       chartSection: 'Série temporal principal',
       chartCaption: 'Registro diário observado com a data selecionada e os limiares aplicados.',
@@ -291,9 +292,9 @@ const TEXT = {
     emptySeasonality: 'Sem eventos suficientes para analisar sazonalidade nesta estação.',
     seasonalityNoEvents: 'Não foi possível derivar um padrão sazonal confiável para os eventos reconstruídos desta estação.',
     theory: {
-      eyebrow: 'Como o atlas funciona',
+      eyebrow: 'Como o LIMIAR funciona',
       title: 'Teoria e fluxo de reconstrução',
-      intro: 'LIMIAR organiza séries diárias, evidência hidráulica observada e limiares estatísticos em um atlas histórico para triagem de sinais de inundação em estações brasileiras.',
+      intro: 'O LIMIAR reúne séries diárias, evidência hidráulica observada e limiares estatísticos para identificar sinais históricos de inundação em estações brasileiras.',
       steps: [
         {
           title: 'Base observacional',
@@ -301,7 +302,7 @@ const TEXT = {
         },
         {
           title: 'Limiar principal',
-          text: 'Quando existe seção hidráulica observada, ela define o limiar de inundação. Onde essa evidência não existe, usamos o Q2 estatístico como fallback.',
+          text: 'Quando existe seção hidráulica observada, ela define o limiar de inundação. Nas demais estações, usamos o Q2 estatístico.',
         },
         {
           title: 'Faixas de alerta e severidade',
@@ -321,7 +322,7 @@ const TEXT = {
         extreme_flooding: 'O limiar severo é excedido, indicando um episódio raro e mais intenso.',
       },
       caveatTitle: 'Leitura correta do produto',
-      caveatText: 'O atlas foi feito para análise histórica, priorização e comunicação científica. Ele não substitui modelagem local, vistoria de campo ou operação oficial de alerta.',
+      caveatText: 'O LIMIAR foi desenvolvido para análise histórica e comunicação científica. Ele não substitui modelagem local, vistoria de campo ou operação oficial de alerta.',
     },
     toasts: {
       loading: 'Carregando...',
@@ -330,7 +331,7 @@ const TEXT = {
       reportError: 'Falha ao gerar o relatório.',
       csvReady: 'CSV exportado.',
       stationDataReady: 'Pacote CSV da estação gerado.',
-      loadError: 'Falha ao carregar o atlas.',
+      loadError: 'Falha ao carregar o LIMIAR.',
     },
   },
   en: {
@@ -349,9 +350,10 @@ const TEXT = {
     fitMapButton: 'Fit map',
     exportCsvButton: 'Export CSV',
     shareButton: 'Share',
-    eyebrowLabel: 'Historical screening atlas',
-    heroTitle: 'Daily search for stations with flood signals',
-    heroText: 'Pick a date to see which stations are normal, in warning, flooded, or in extreme flooding.',
+    actionsMenuLabel: 'Actions',
+    eyebrowLabel: 'Historical flood reconstruction',
+    heroTitle: 'Flood conditions by station and date',
+    heroText: 'Choose a date to find stations under normal, warning, flooded, or extreme flooding conditions.',
     statStationsLabel: 'Published stations',
     statRangeLabel: 'Date range',
     statLatestLabel: 'Latest date',
@@ -375,7 +377,7 @@ const TEXT = {
     selectedMetricQaLabel: 'Uncertainty',
     legendTitle: 'Legend',
     stationTabButton: 'Station',
-    datasetTabButton: 'Dataset',
+    datasetTabButton: 'Brazil overview',
     stationHeading: 'Station',
     stationSubheading: 'No station selected',
     exportStationDataButton: 'Download station CSVs',
@@ -407,17 +409,17 @@ const TEXT = {
     statusTotalsTitle: 'Selected-day totals',
     datasetBreakdownTitle: 'Coverage and distribution',
     howToReadTitle: 'How to read',
-    howToReadText: 'The map prioritizes observed hydraulic thresholds. Where those do not exist, the atlas uses statistical Q2 thresholds. Warning and severe flooding use statistical return-period thresholds.',
+    howToReadText: 'The map prioritizes observed hydraulic thresholds. At stations without one, LIMIAR uses the statistical Q2 threshold. Warning and severe flooding use statistical return-period thresholds.',
     thStartDate: 'Start',
-    caveatTitle: 'Scientific caveat',
-    caveatText: 'This atlas shows a historical picture for analysis. It is not a real-time warning system and does not replace local assessment.',
+    caveatTitle: 'Limits of use',
+    caveatText: 'LIMIAR presents historical records for analysis. It is not a real-time warning system and does not replace local assessment.',
     thPeakDate: 'Peak date',
     thDuration: 'Duration',
     thPeak: 'Peak',
     thClass: 'Class',
     visibleStations: 'visible',
     loadMoreStations: 'Load more',
-    loadingAtlas: 'Loading atlas...',
+    loadingAtlas: 'Loading LIMIAR...',
     loadingDate: 'Loading date...',
     loadingStation: 'Loading station...',
     fullRecordLabel: 'Full record',
@@ -448,7 +450,7 @@ const TEXT = {
     imageExpandButton: 'Expand figure',
     imageOverlayTitle: 'Detailed hydraulic panel',
     closeLabel: 'Close',
-    fatalTitle: 'Atlas failed to load',
+    fatalTitle: 'LIMIAR failed to load',
     fatalMessage: 'Open this site through a local web server so the browser can read the data files.',
     fatalCommandLabel: 'From the terminal, inside the github/LIMIAR folder, run:',
     status: {
@@ -509,7 +511,7 @@ const TEXT = {
       meanDuration: 'Mean duration',
       durationStd: 'Duration standard deviation',
       hydraulicStations: 'Hydraulic-threshold stations',
-      q2FallbackStations: 'Q2 fallback stations',
+      q2FallbackStations: 'Stations using Q2',
       crossSectionStations: 'With cross section',
       ratingCurveStations: 'With rating curve',
       totalEvents: 'Reconstructed events',
@@ -533,7 +535,7 @@ const TEXT = {
       title: 'Station technical brief',
       summarySection: 'Station summary',
       methodSection: 'How to interpret this station',
-      methodText: 'LIMIAR compares the observed daily value against the thresholds valid for that period. Whenever observed hydraulic evidence exists, it defines the primary flood threshold; where it does not, the atlas uses statistical Q2 as a fallback. This is a historical screening product, not a real-time operational warning system.',
+      methodText: 'LIMIAR compares each observed daily value with the thresholds valid for that period. Observed hydraulic evidence defines the primary threshold when available. At the remaining stations, statistical Q2 defines the threshold. The system presents historical records and does not issue real-time warnings.',
       statusSection: 'Selected-day conditions',
       chartSection: 'Primary time series',
       chartCaption: 'Observed daily record with the selected day and the thresholds applied to that period.',
@@ -578,9 +580,9 @@ const TEXT = {
     emptySeasonality: 'Not enough events are available to analyze seasonality for this station.',
     seasonalityNoEvents: 'No reliable seasonal pattern could be derived for reconstructed events at this station.',
     theory: {
-      eyebrow: 'How the atlas works',
+      eyebrow: 'How LIMIAR works',
       title: 'Theory and reconstruction workflow',
-      intro: 'LIMIAR organizes daily records, observed hydraulic evidence, and statistical thresholds into a historical atlas for screening flood signals at Brazilian stations.',
+      intro: 'LIMIAR combines daily records, observed hydraulic evidence, and statistical thresholds to identify historical flood signals at Brazilian stations.',
       steps: [
         {
           title: 'Observed record',
@@ -588,7 +590,7 @@ const TEXT = {
         },
         {
           title: 'Primary flood threshold',
-          text: 'When an observed hydraulic cross section exists, it defines the flood threshold. Where that evidence does not exist, statistical Q2 is used as a fallback.',
+          text: 'When an observed hydraulic cross section exists, it defines the flood threshold. At the remaining stations, statistical Q2 is used.',
         },
         {
           title: 'Warning and severe bands',
@@ -608,7 +610,7 @@ const TEXT = {
         extreme_flooding: 'The severe threshold is exceeded, indicating a rarer and more intense episode.',
       },
       caveatTitle: 'How to read the product correctly',
-      caveatText: 'The atlas is intended for historical analysis, prioritization, and scientific communication. It does not replace local modeling, field review, or official warning operations.',
+      caveatText: 'LIMIAR was developed for historical analysis and scientific communication. It does not replace local modeling, field review, or official warning operations.',
     },
     toasts: {
       loading: 'Loading...',
@@ -617,7 +619,7 @@ const TEXT = {
       reportError: 'Could not generate report.',
       csvReady: 'CSV exported.',
       stationDataReady: 'Station CSV package generated.',
-      loadError: 'Failed to load atlas.',
+      loadError: 'Failed to load LIMIAR.',
     },
   },
 };
@@ -641,7 +643,7 @@ const GUIDE_CONTENT = {
   pt: {
     badge: 'Comece aqui',
     progressLabel: 'Passos do guia',
-    skip: 'Pular para o atlas',
+    skip: 'Ir para o LIMIAR',
     back: 'Voltar',
     next: 'Próximo',
     finish: 'Começar a explorar',
@@ -649,8 +651,8 @@ const GUIDE_CONTENT = {
     steps: [
       {
         eyebrow: 'O que é o LIMIAR',
-        title: 'Um atlas histórico para entender sinais de inundação',
-        text: 'O LIMIAR reúne registros diários, limiares hidráulicos e contexto das estações para mostrar como cada local se comportou em uma data do arquivo histórico.',
+        title: 'Registros históricos para entender sinais de inundação',
+        text: 'O LIMIAR reúne registros diários, limiares hidráulicos e informações das estações para mostrar como cada local se comportou em uma data do período disponível.',
         visual: 'lockup',
         visualCaption: 'Busca diária, mapa nacional e evidência hidráulica reunidos em uma única interface.',
         highlights: [
@@ -703,14 +705,14 @@ const GUIDE_CONTENT = {
           { title: 'Evidência hidráulica', text: 'Abra seções transversais, curva-chave e evolução dos limiares.' },
           { title: 'Exportações', text: 'Baixe CSVs ou gere um resumo DOCX da estação.' },
         ],
-        note: 'O LIMIAR é um atlas histórico para análise e comunicação. Ele não substitui operação oficial de alerta em tempo real.',
+        note: 'O LIMIAR apresenta registros históricos para análise e comunicação. Ele não substitui operação oficial de alerta em tempo real.',
       },
     ],
   },
   en: {
     badge: 'Start here',
     progressLabel: 'Guide steps',
-    skip: 'Skip to atlas',
+    skip: 'Go to LIMIAR',
     back: 'Back',
     next: 'Next',
     finish: 'Start exploring',
@@ -718,8 +720,8 @@ const GUIDE_CONTENT = {
     steps: [
       {
         eyebrow: 'What LIMIAR is',
-        title: 'A historical atlas for understanding flood signals',
-        text: 'LIMIAR brings together daily records, hydraulic thresholds, and station context so you can see how each location behaved on a given day in the historical archive.',
+        title: 'Historical records for understanding flood signals',
+        text: 'LIMIAR brings together daily records, hydraulic thresholds, and station information so you can see how each location behaved on a given day in the available period.',
         visual: 'lockup',
         visualCaption: 'Daily lookup, national map, and hydraulic evidence in one interface.',
         highlights: [
@@ -772,7 +774,7 @@ const GUIDE_CONTENT = {
           { title: 'Hydraulic evidence', text: 'Open cross sections, rating curves, and threshold evolution.' },
           { title: 'Exports', text: 'Download CSVs or generate a DOCX station brief.' },
         ],
-        note: 'LIMIAR is a historical atlas for analysis and communication. It is not an operational real-time warning system.',
+        note: 'LIMIAR presents historical records for analysis and communication. It is not an operational real-time warning system.',
       },
     ],
   },
@@ -1539,7 +1541,7 @@ async function tryRedirectFromFileMode() {
       return true;
     }
   } catch (error) {
-    console.warn('Local atlas server not reachable from file mode.', error);
+    console.warn('Local LIMIAR server not reachable from file mode.', error);
   } finally {
     window.clearTimeout(timer);
   }
@@ -2089,7 +2091,7 @@ function getStatusInfo(stationCode, dateString) {
 
 function applyStaticTranslations() {
   const keys = [
-    'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton',
+    'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton', 'actionsMenuLabel',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
@@ -2122,6 +2124,8 @@ function applyStaticTranslations() {
   }
   const languageSwitch = document.querySelector('.language-switch');
   if (languageSwitch) languageSwitch.setAttribute('aria-label', text('languageSwitchLabel'));
+  const actionsSummary = document.querySelector('.actions-menu summary');
+  if (actionsSummary) actionsSummary.setAttribute('aria-label', text('actionsMenuLabel'));
   const fullRangeButton = document.querySelector('.range-button[data-range="full"]');
   if (fullRangeButton) fullRangeButton.textContent = text('fullRecordLabel');
   const fatalTitle = byId('fatalTitle');
@@ -2518,8 +2522,8 @@ function renderDatasetMetrics() {
   renderMetricArticles(byId('statusTotals'), Object.entries(counts).map(([key, value]) => [statusLabel(key), formatNumber(value)]));
 
   const thresholdNarrative = state.lang === 'pt'
-    ? `${formatCountShare(hydraulicCount, totalCount)} usam limiar hidráulico observado, enquanto ${formatCountShare(q2FallbackCount, totalCount)} dependem de fallback Q2.`
-    : `${formatCountShare(hydraulicCount, totalCount)} use observed hydraulic thresholds, while ${formatCountShare(q2FallbackCount, totalCount)} rely on Q2 fallback.`;
+    ? `${formatCountShare(hydraulicCount, totalCount)} usam limiar hidráulico observado, enquanto ${formatCountShare(q2FallbackCount, totalCount)} usam limiar Q2.`
+    : `${formatCountShare(hydraulicCount, totalCount)} use observed hydraulic thresholds, while ${formatCountShare(q2FallbackCount, totalCount)} use Q2 thresholds.`;
   const evidenceNarrative = state.lang === 'pt'
     ? `${formatCountShare(crossSectionCount, totalCount)} contam com seção transversal observada, ${formatCountShare(ratingCurveCount, totalCount)} têm curva-chave disponível, e ${formatNumber(qaPanelCount)} painéis QA pré-renderizados acompanham este pacote.`
     : `${formatCountShare(crossSectionCount, totalCount)} include observed cross sections, ${formatCountShare(ratingCurveCount, totalCount)} have rating curves available, and ${formatNumber(qaPanelCount)} pre-rendered QA panels are bundled in this package.`;
@@ -2585,7 +2589,15 @@ function updateDateNavigation() {
       dateScrubber.value = '0';
       dateScrubber.disabled = true;
     }
+    const span = Number(dateScrubber.max) - Number(dateScrubber.min);
+    const progress = span > 0 ? ((Number(dateScrubber.value) - Number(dateScrubber.min)) / span) * 100 : 0;
+    dateScrubber.style.setProperty('--timeline-progress', `${progress}%`);
   }
+
+  const timelineStart = byId('dateTimelineStart');
+  const timelineEnd = byId('dateTimelineEnd');
+  if (timelineStart) timelineStart.textContent = minDate ? minDate.slice(0, 4) : '-';
+  if (timelineEnd) timelineEnd.textContent = maxDate ? maxDate.slice(0, 4) : '-';
 
   const prevButton = byId('prevDateButton');
   const nextButton = byId('nextDateButton');
@@ -4829,6 +4841,9 @@ function wireEvents() {
     dateScrubber.addEventListener('input', (event) => {
       const scrubberDate = dateForScrubberOffset(event.target.value);
       byId('datePicker').value = scrubberDate;
+      const span = Number(event.target.max) - Number(event.target.min);
+      const progress = span > 0 ? ((Number(event.target.value) - Number(event.target.min)) / span) * 100 : 0;
+      event.target.style.setProperty('--timeline-progress', `${progress}%`);
       if (state.dateScrubberTimer) window.clearTimeout(state.dateScrubberTimer);
       state.dateScrubberTimer = window.setTimeout(async () => {
         state.dateScrubberTimer = null;
@@ -4858,6 +4873,13 @@ function wireEvents() {
   byId('shareButton').addEventListener('click', async () => {
     await navigator.clipboard.writeText(window.location.href);
     showToast(TEXT[state.lang].toasts.copied);
+  });
+  const actionsMenu = byId('actionsMenu');
+  document.querySelectorAll('.actions-menu-panel button').forEach((button) => {
+    button.addEventListener('click', () => actionsMenu?.removeAttribute('open'));
+  });
+  document.addEventListener('click', (event) => {
+    if (actionsMenu?.open && !actionsMenu.contains(event.target)) actionsMenu.removeAttribute('open');
   });
   byId('exportStationDataButton').addEventListener('click', exportStationDataPackage);
   Object.keys(STATION_CSV_EXPORTS).forEach((id) => {
