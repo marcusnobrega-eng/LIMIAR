@@ -19,6 +19,7 @@ Main contents:
 - `index.html`: static site entry point
 - `app.js`: client-side application logic
 - `styles.css`: site styling
+- `observability.js`: optional provider-neutral browser observability adapter
 - `assets/`: logo and published QA panel images
 - `vendor/`: third-party browser libraries bundled with the site
 - `data/`: prebuilt station and daily status assets consumed by the frontend
@@ -62,6 +63,8 @@ LIMIAR is a historical and screening-oriented product. It should not be interpre
 ## Update workflow
 
 The website bundle published here is generated from the main research workspace and then synchronized into this repository for GitHub Pages deployment. Every correction, improvement, maintenance task, and new function must begin with a GitHub Issue and be delivered through a pull request that closes that Issue. See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+
+Production monitoring is optional and disabled by default. See [OBSERVABILITY.md](OBSERVABILITY.md) for the Sentry, Datadog, New Relic, and OpenTelemetry adapters and privacy constraints.
 
 In practice:
 

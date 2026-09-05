@@ -31,6 +31,13 @@ const STATUS_RADIUS_MULTIPLIER = {
   no_data: 1,
 };
 
+const telemetry = window.LIMIAR_OBSERVABILITY || {
+  event() {},
+  error() {},
+  measure() {},
+};
+const APP_STARTED_AT = performance.now();
+
 const QA_PANEL_PARTS = [
   { key: 'cross_section', className: 'qa-subpanel-top-left', col: 0, row: 0 },
   { key: 'daily_exceedance', className: 'qa-subpanel-top-right', col: 1, row: 0 },
@@ -2010,11 +2017,36 @@ async function safeBuildQaPanelPartImages(src) {
   }
 }
 
-function loadJson(path) {
-  return fetch(path).then((response) => {
-    if (!response.ok) throw new Error(`Could not load ${path}`);
-    return response.json();
-  });
+function jsonResourceType(path) {
+  if (path.includes('/status/')) return 'monthly-status';
+  if (/\/stations\/[^/]+\.json/.test(path)) return 'station-detail';
+  if (path.endsWith('/stations.json') || path === 'data/stations.json') return 'station-index';
+  if (path.endsWith('/manifest.json') || path === 'data/manifest.json') return 'manifest';
+  return 'json';
+}
+
+async function loadJson(path) {
+  const startedAt = performance.now();
+  const resourceType = jsonResourceType(path);
+  try {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not load ${resourceType}`);
+    const data = await response.json();
+    telemetry.measure('data.loaded', startedAt, {
+      component: 'data',
+      resource_type: resourceType,
+      status: 'success',
+    });
+    return data;
+  } catch (error) {
+    telemetry.error(error, {
+      component: 'data',
+      operation: 'load-json',
+      resource_type: resourceType,
+      status: 'error',
+    });
+    throw error;
+  }
 }
 
 function monthKey(dateString) {
@@ -3732,6 +3764,7 @@ function renderEmptySelection() {
 }
 
 async function selectStation(stationCode) {
+  const startedAt = performance.now();
   state.selectedCode = stationCode;
   renderStationList();
   const station = state.stationByCode.get(stationCode);
@@ -3748,6 +3781,11 @@ async function selectStation(stationCode) {
     renderEventsTable(data);
     renderQaSection(data);
     renderStationCharts(data);
+    telemetry.measure('station.loaded', startedAt, {
+      component: 'station',
+      operation: 'select',
+      status: 'success',
+    });
   } finally {
     setRegionLoading('station', false);
     completeAppProgress();
@@ -4951,6 +4989,11 @@ async function boot() {
   byId('appShell')?.setAttribute('aria-busy', 'false');
   document.body.classList.remove('app-loading');
   document.body.classList.add('app-ready');
+  telemetry.measure('application.ready', APP_STARTED_AT, {
+    component: 'application',
+    language: state.lang,
+    status: 'success',
+  });
 
   if (shouldAutoOpenGuide(urlState)) {
     openGuide(0, byId('theoryButton'));
