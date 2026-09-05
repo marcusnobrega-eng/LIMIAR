@@ -1,0 +1,26 @@
+name: New function
+description: Propose a new user-visible capability.
+title: "[New function]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: Describe who needs the function and what they need to accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected behavior
+      description: Include loading, empty, success, and error states.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true

@@ -61,12 +61,14 @@ LIMIAR is a historical and screening-oriented product. It should not be interpre
 
 ## Update workflow
 
-The website bundle published here is generated from the main research workspace and then synchronized into this repository for GitHub Pages deployment.
+The website bundle published here is generated from the main research workspace and then synchronized into this repository for GitHub Pages deployment. Every correction, improvement, maintenance task, and new function must begin with a GitHub Issue and be delivered through a pull request that closes that Issue. See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
 In practice:
 
 - research processing happens in the main project workspace
 - browser-ready assets are written to the website bundle
 - the updated bundle is copied into this repository
-- changes are committed and pushed to `main`
-- GitHub Pages deploys the public site
+- changes are committed to an Issue-specific branch
+- a pull request references and closes the Issue
+- checks and review complete before merge
+- GitHub Pages deploys the reviewed `main` branch
