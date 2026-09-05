@@ -48,3 +48,51 @@ describe('date and quantile helpers', () => {
     expect(core.quantileFromSorted([0, 10, 20], 0.75)).toBe(15);
   });
 });
+
+describe('daily station analysis', () => {
+  const rows = [
+    { uf: 'AM', lat: -3, lon: -60, status: 'normal' },
+    { uf: 'AM', lat: -4, lon: -61, status: 'warning' },
+    { uf: 'AM', lat: -5, lon: -62, status: 'flooded' },
+    { uf: 'PA', lat: -1, lon: -50, status: 'extreme_flooding' },
+    { uf: 'PA', lat: -2, lon: -49, status: 'no_data' },
+    { uf: 'RO', lat: null, lon: null, status: 'unknown' },
+  ];
+
+  it('counts valid readings and conditions outside normal', () => {
+    const summary = core.summarizeDailyStations(rows);
+    expect(summary.total).toBe(6);
+    expect(summary.valid).toBe(4);
+    expect(summary.outsideNormal).toBe(3);
+    expect(summary.statusCounts).toEqual({
+      normal: 1,
+      warning: 1,
+      flooded: 1,
+      extreme_flooding: 1,
+      no_data: 2,
+    });
+  });
+
+  it('ranks states by the share outside normal among valid readings', () => {
+    const { stateRanking } = core.summarizeDailyStations(rows);
+    expect(stateRanking).toEqual([
+      { uf: 'PA', valid: 1, outsideNormal: 1, share: 1 },
+      { uf: 'AM', valid: 3, outsideNormal: 2, share: 2 / 3 },
+    ]);
+  });
+
+  it('places outside-normal stations in fixed coordinate bins', () => {
+    const summary = core.summarizeDailyStations(rows);
+    expect(summary.latitudeBins.find((bin) => bin.start === -5)?.counts).toEqual({
+      warning: 1,
+      flooded: 1,
+      extreme_flooding: 1,
+    });
+    expect(summary.longitudeBins.find((bin) => bin.start === -65)?.counts).toEqual({
+      warning: 1,
+      flooded: 1,
+      extreme_flooding: 0,
+    });
+    expect(summary.longitudeBins.find((bin) => bin.start === -50)?.counts.extreme_flooding).toBe(1);
+  });
+});

@@ -16,6 +16,20 @@ test('steps through dates with the custom timeline controls', async ({ page }) =
   await expect(page).toHaveURL(/date=2020-01-02/);
 });
 
+test('shows daily conditions, spatial distributions, and state ranking', async ({ page }) => {
+  await page.goto('/?date=2020-01-01&lang=en&guide=0');
+  await expect(page.locator('#statStations')).toHaveText('2,610', { timeout: 30_000 });
+  await page.locator('#dailyAnalysisTabButton').click();
+  await expect(page.locator('#dailyAnalysisPanel')).toBeVisible();
+  await expect(page.locator('#dailyStationsShown')).not.toHaveText('-');
+  await expect(page.locator('#dailyValidReadings')).toContainText('%');
+  await expect(page.locator('#dailyOutsideNormal')).toContainText('%');
+  await expect(page.locator('#dailyConditionsChart')).toBeVisible();
+  await expect(page.locator('#dailyLatitudeChart')).toBeVisible();
+  await expect(page.locator('#dailyLongitudeChart')).toBeVisible();
+  await expect(page.locator('#dailyStateTableBody tr')).toHaveCount(5);
+});
+
 test('limits the initial station list on a phone and loads more on request', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'Mobile behavior only');
   await page.goto('/?date=2020-01-01&lang=en&guide=0');
