@@ -13,9 +13,11 @@ import {
   REPORT_PAGE,
   reportFigureLayout,
   reportTextWidthPt,
+  isProvisionalOffset,
+  provisionalRuns,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=5';
+} from './core.js?v=6';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
@@ -99,6 +101,13 @@ const TEXT = {
     exportRatingTableCsvButton: 'Baixar tabela',
     consistencyRaw: 'Bruta (1)',
     consistencyChecked: 'Consistida (2)',
+    dataVersion: 'Versão dos dados',
+    provisionalNote: (date) => `dados consistidos pela ANA em geral até ${date}; depois disso, dados brutos e provisórios`,
+    provisionalDay: 'Dado bruto (provisório)',
+    provisionalSeries: 'Dados brutos (provisórios)',
+    consistedThrough: 'Consistido até',
+    csvConsisted: 'consistido',
+    csvRaw: 'bruto',
     segmentOf: 'de',
     openEnded: 'em aberto',
     noBankfull: 'sem margens plenas válidas',
@@ -339,6 +348,7 @@ const TEXT = {
         eventsHeading: 'Eventos reconstruídos',
         eventsText: 'Um evento é uma sequência contínua de dias válidos igual ou acima do limiar ativo. Um dia abaixo do limiar, ou uma falha no registro, encerra o evento.',
         uncertaintyHeading: 'Incerteza e limitações',
+        provisional: (raw, total, share, date) => `Dos ${total} dias observados desta estação, ${raw} (${share}) usam dados brutos que a ANA ainda não consistiu e podem mudar quando forem consistidos. No site, eles aparecem sombreados no gráfico da série e marcados na coluna ana_consistency do CSV. Os dados consistidos vão até ${date}.`,
         uncertainty: [
           'A cota de margens plenas vem de uma regra geométrica aplicada em todo o país. A interpretação de campo pode variar entre rios.',
           'A comparação em cota supõe que a série diária e a seção usam a mesma referência vertical, o que as tabelas públicas não permitem verificar em todas as estações.',
@@ -467,6 +477,13 @@ const TEXT = {
     exportRatingTableCsvButton: 'Download table',
     consistencyRaw: 'Raw (1)',
     consistencyChecked: 'Consisted (2)',
+    dataVersion: 'Data version',
+    provisionalNote: (date) => `ANA consisted data typically through ${date}; raw, provisional data after that`,
+    provisionalDay: 'Raw data (provisional)',
+    provisionalSeries: 'Raw data (provisional)',
+    consistedThrough: 'Consisted through',
+    csvConsisted: 'consisted',
+    csvRaw: 'raw',
     segmentOf: 'of',
     openEnded: 'open',
     noBankfull: 'no valid bankfull stage',
@@ -707,6 +724,7 @@ const TEXT = {
         eventsHeading: 'Reconstructed events',
         eventsText: 'An event is a continuous run of valid days at or above the active threshold. One day below the threshold, or a gap in the record, ends the event.',
         uncertaintyHeading: 'Uncertainty and limits',
+        provisional: (raw, total, share, date) => `Of this station's ${total} observed days, ${raw} (${share}) use raw data that ANA has not yet consisted and may change once they are. On the site they are shaded in the time-series chart and marked in the ana_consistency column of the CSV. Consisted data run through ${date}.`,
         uncertainty: [
           'Bankfull stage comes from one geometric rule applied nationally. Field interpretations can differ among rivers.',
           'Stage comparison assumes that the daily series and the cross section share a vertical reference, which the public tables do not allow us to check at every station.',
@@ -1401,6 +1419,39 @@ const plotFramePlugin = {
   },
 };
 
+// Grey bands behind the data where the series uses raw (unconsisted) ANA records.
+const provisionalShadePlugin = {
+  id: 'provisionalShade',
+  beforeDatasetsDraw(chart, _args, options) {
+    const runs = options?.runs;
+    if (!runs?.length || !chart.scales?.x || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const count = chart.data.labels?.length || 1;
+    const halfStep = (chartArea.right - chartArea.left) / Math.max(1, count - 1) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(35, 56, 63, 0.08)';
+    runs.forEach(([start, end]) => {
+      const left = Math.max(chartArea.left, scales.x.getPixelForValue(start) - halfStep);
+      const right = Math.min(chartArea.right, scales.x.getPixelForValue(end) + halfStep);
+      if (right > left) ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+    });
+    if (options.label) {
+      const [start, end] = runs[runs.length - 1];
+      const left = Math.max(chartArea.left, scales.x.getPixelForValue(start) - halfStep);
+      const right = Math.min(chartArea.right, scales.x.getPixelForValue(end) + halfStep);
+      const fontSize = Number(options.fontSize) || 11;
+      ctx.font = `600 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
+      if (ctx.measureText(options.label).width + 8 <= right - left) {
+        ctx.fillStyle = CHART_THEME.muted;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(options.label, left + 4, chartArea.top + 4);
+      }
+    }
+    ctx.restore();
+  },
+};
+
 const selectedDateLinePlugin = {
   id: 'selectedDateLine',
   afterDatasetsDraw(chart, _args, options) {
@@ -1426,7 +1477,7 @@ if (window.Chart?.register) {
   window.Chart.defaults.font.size = 12;
   window.Chart.defaults.elements.line.borderCapStyle = 'round';
   window.Chart.defaults.elements.line.borderJoinStyle = 'round';
-  window.Chart.register(plotFramePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
+  window.Chart.register(plotFramePlugin, provisionalShadePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -2747,6 +2798,14 @@ function renderGlobalStats() {
   byId('statStations').textContent = formatNumber(state.manifest.published_station_count);
   byId('statRange').textContent = `${formatShortDate(state.manifest.supported_date_min)} - ${formatShortDate(state.manifest.supported_date_max)}`;
   byId('statLatest').textContent = formatShortDate(state.manifest.latest_status_date);
+  const note = byId('dataVersionNote');
+  const version = state.manifest.data_version;
+  const provisionalStations = Number(state.manifest.provisional_station_count) || 0;
+  note.hidden = !version;
+  note.textContent = [
+    version ? `${text('dataVersion')} ${version}` : '',
+    provisionalStations && state.manifest.consisted_through_median ? text('provisionalNote')(formatDate(state.manifest.consisted_through_median)) : '',
+  ].filter(Boolean).join(' · ');
 }
 
 function statusTotals() {
@@ -3185,12 +3244,16 @@ function hydrateStationData(raw) {
       key: curveKey(curveId, segmentId),
     })),
   };
+  // Bundles built before monthly updates carry no consistency information.
+  hydrated.hasConsistency = Array.isArray(raw.daily.provisional);
+  const provisional = raw.daily.provisional || [];
   hydrated.dailyRows = raw.daily.rows.map(([offset, observed, statusChar, basisChar]) => ({
     offset: Number(offset),
     date: addDays(startDate, Number(offset)),
     observed_value: observed,
     status: statusKeyFromChar(statusChar),
     basis: basisKeyFromChar(basisChar),
+    provisional: observed != null && isProvisionalOffset(provisional, Number(offset)),
   }));
   hydrated.dailyMap = new Map(hydrated.dailyRows.map((row) => [row.date, row]));
   hydrated.intervalsHydrated = raw.intervals.map(([startOffset, endOffset, valueType, alert, flood, severe, thresholdSource, crossSectionDate, crossSectionId, flags, ratingCurveId, ratingCurveSegmentId]) => {
@@ -3279,6 +3342,12 @@ function renderStatusCard(stationData) {
     span.textContent = index === 0 ? statusLabel(value) : (index === 1 ? basisLabel(value) : uncertaintyLabel(value));
     badgeWrap.appendChild(span);
   });
+  if (stationData.dailyMap.get(state.selectedDate)?.provisional) {
+    const span = document.createElement('span');
+    span.className = 'pill provisional';
+    span.textContent = text('provisionalDay');
+    badgeWrap.appendChild(span);
+  }
 
   const statusGrid = byId('statusGrid');
   const cards = [
@@ -3289,6 +3358,9 @@ function renderStatusCard(stationData) {
     [text('fields').severe, formatValue(details.severe, details.valueType)],
     [text('fields').range, `${formatShortDate(stationData.summary.daily_record_start)} - ${formatShortDate(stationData.summary.daily_record_end)}`],
   ];
+  if (stationData.dailyRows.some((row) => row.provisional)) {
+    cards.push([text('consistedThrough'), formatShortDate(stationData.summary.consisted_through)]);
+  }
   statusGrid.innerHTML = cards.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('');
 }
 
@@ -3431,6 +3503,7 @@ function renderTimeseriesChart(stationData) {
   const flood = normalizedThresholdRows.map((row) => row.flood);
   const severe = normalizedThresholdRows.map((row) => row.severe);
   const highlightValue = values[labels.indexOf(state.selectedDate)];
+  const provisionalLabelRuns = provisionalRuns(rows.map((row) => row.provisional)).map(([start, end]) => [labels[start], labels[end]]);
 
   destroyChart('timeseriesChart');
   const ctx = canvas;
@@ -3534,6 +3607,7 @@ function renderTimeseriesChart(stationData) {
           },
         }),
         thresholdLabels: { enabled: true },
+        provisionalShade: { runs: provisionalLabelRuns, label: text('provisionalSeries') },
         selectedDateLine: { value: state.selectedDate },
       }),
       scales: {
@@ -4594,6 +4668,7 @@ function dailySeriesCsvRows(stationData) {
     'estimated_discharge_m3s',
     'rating_curve_segment_id',
     'rating_curve_valid_on_date',
+    'ana_consistency',
   ]];
   stationData.dailyRows.forEach((row) => {
     const interval = findIntervalForDate(stationData, row.date);
@@ -4621,6 +4696,7 @@ function dailySeriesCsvRows(stationData) {
       estimatedDischarge,
       estimate.segment?.segmentId || '',
       estimate.validOnDate == null ? '' : estimate.validOnDate,
+      !stationData.hasConsistency || row.observed_value == null ? '' : text(row.provisional ? 'csvRaw' : 'csvConsisted'),
     ]);
   });
   return rows;
@@ -5213,8 +5289,10 @@ function reportMethodEquations() {
   };
 }
 
-function reportMethodsChildren(heading, subheading) {
+function reportMethodsChildren(heading, subheading, stationData) {
   const methods = TEXT[state.lang].report.methods;
+  const observedDays = stationData.dailyRows.filter((row) => row.observed_value != null).length;
+  const rawDays = stationData.dailyRows.filter((row) => row.provisional).length;
   const equations = reportMethodEquations();
   const prose = (value) => reportParagraph('', { children: reportRichRuns(value), after: 100 });
   const bullet = (value) => reportParagraph('', { children: reportRichRuns(value), bullet: { level: 0 }, after: 60 });
@@ -5240,6 +5318,12 @@ function reportMethodsChildren(heading, subheading) {
     prose(methods.eventsText),
     subheading(methods.uncertaintyHeading),
     ...methods.uncertainty.map(bullet),
+    ...(rawDays ? [bullet(methods.provisional(
+      formatNumber(rawDays),
+      formatNumber(observedDays),
+      formatPercent(rawDays / observedDays, 1),
+      formatDate(stationData.summary.consisted_through),
+    ))] : []),
   ];
 }
 
@@ -5565,7 +5649,7 @@ async function exportStationReport() {
           heading(report.eventsSection),
           reportTable(eventsTableRows, eventColumns),
         ]),
-        reportSection(report.methods.title, footerText, reportMethodsChildren(heading, subheading)),
+        reportSection(report.methods.title, footerText, reportMethodsChildren(heading, subheading, state.selectedData)),
       ],
     });
     let blob;
