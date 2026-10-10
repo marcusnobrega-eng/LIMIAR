@@ -10,6 +10,8 @@ const NS = {
 };
 
 const SHEET = 'LIMIAR';
+// White plotting area with a frame, as on the website.
+const PLOT_AREA = '<c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="8C9A9F"/></a:solidFill></a:ln></c:spPr>';
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -261,7 +263,7 @@ export function chartXml(model, { font = 'Helvetica Light', boldFont = 'Helvetic
   const { plots, axes } = model.kind === 'category'
     ? categoryPlot(model, columns, typography)
     : scatterPlot(model, columns, typography, dateFormat);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${NS.c}" xmlns:a="${NS.a}" xmlns:r="${NS.r}"><c:date1904 val="0"/><c:lang val="${lang}"/><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${plots}${axes}</c:plotArea>${legendXml(model)}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${size * 100}"><a:solidFill><a:srgbClr val="24323A"/></a:solidFill><a:latin typeface="${escapeXml(font)}"/></a:defRPr></a:pPr><a:endParaRPr lang="${lang}"/></a:p></c:txPr><c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${NS.c}" xmlns:a="${NS.a}" xmlns:r="${NS.r}"><c:date1904 val="0"/><c:lang val="${lang}"/><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${plots}${axes}${PLOT_AREA}</c:plotArea>${legendXml(model)}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${size * 100}"><a:solidFill><a:srgbClr val="24323A"/></a:solidFill><a:latin typeface="${escapeXml(font)}"/></a:defRPr></a:pPr><a:endParaRPr lang="${lang}"/></a:p></c:txPr><c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
 }
 
 /** The parts of the embedded .xlsx workbook that holds a chart's data. */
