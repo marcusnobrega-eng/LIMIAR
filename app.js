@@ -1,8 +1,11 @@
 import {
   addDays,
+  bankfullFromProfile,
   normalizeThresholdTriplet,
+  parseRatingSegmentId,
   quantileFromSorted,
   ratingDischarge,
+  ratingEquationParts,
   ratingStageFromDischarge,
   validCurveDischarge,
   REPORT_MIN_CHART_FONT_PT,
@@ -11,7 +14,7 @@ import {
   reportTextWidthPt,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=4';
+} from './core.js?v=5';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=1';
 
 const STATUS_MAP = {
@@ -73,6 +76,29 @@ const TEXT = {
     previousDateLabel: 'Dia anterior',
     nextDateLabel: 'Próximo dia',
     dateScrubberLabel: 'Controle de rolagem da data',
+    crossSectionTableTitle: 'Levantamentos das seções',
+    crossSectionTableNote: 'Calculado sobre o perfil completo: o talvegue é o ponto mais baixo e a cota de margens plenas é a menor das duas margens.',
+    thSurveyDate: 'Data do levantamento',
+    thThalweg: 'Talvegue (cm)',
+    thLeftBank: 'Margem esquerda (cm)',
+    thRightBank: 'Margem direita (cm)',
+    thBankfull: 'Margens plenas (cm)',
+    thDepth: 'Profundidade até margens plenas (cm)',
+    ratingTableTitle: 'Curvas-chave',
+    ratingTableNote: 'Um trecho por linha. H é a cota em metros e Q a vazão em m³/s.',
+    thValidFrom: 'Válida de',
+    thValidTo: 'Válida até',
+    thSegment: 'Trecho',
+    thConsistency: 'Consistência',
+    thStageRange: 'Faixa de cota (cm)',
+    thEquation: 'Equação',
+    exportCrossSectionTableCsvButton: 'Baixar tabela',
+    exportRatingTableCsvButton: 'Baixar tabela',
+    consistencyRaw: 'Bruta (1)',
+    consistencyChecked: 'Consistida (2)',
+    segmentOf: 'de',
+    openEnded: 'em aberto',
+    noBankfull: 'sem margens plenas válidas',
     theoryButton: 'Como funciona',
     layersButton: 'Camadas',
     fitMapButton: 'Ajustar mapa',
@@ -416,6 +442,29 @@ const TEXT = {
     previousDateLabel: 'Previous day',
     nextDateLabel: 'Next day',
     dateScrubberLabel: 'Date scroll control',
+    crossSectionTableTitle: 'Cross-section surveys',
+    crossSectionTableNote: 'Computed on the full profile: the thalweg is the lowest point and bankfull stage is the lower of the two banks.',
+    thSurveyDate: 'Survey date',
+    thThalweg: 'Thalweg (cm)',
+    thLeftBank: 'Left bank (cm)',
+    thRightBank: 'Right bank (cm)',
+    thBankfull: 'Bankfull stage (cm)',
+    thDepth: 'Depth to bankfull (cm)',
+    ratingTableTitle: 'Rating curves',
+    ratingTableNote: 'One segment per row. H is stage in metres and Q discharge in m³/s.',
+    thValidFrom: 'Valid from',
+    thValidTo: 'Valid to',
+    thSegment: 'Segment',
+    thConsistency: 'Consistency',
+    thStageRange: 'Stage range (cm)',
+    thEquation: 'Equation',
+    exportCrossSectionTableCsvButton: 'Download table',
+    exportRatingTableCsvButton: 'Download table',
+    consistencyRaw: 'Raw (1)',
+    consistencyChecked: 'Consisted (2)',
+    segmentOf: 'of',
+    openEnded: 'open',
+    noBankfull: 'no valid bankfull stage',
     theoryButton: 'How it works',
     layersButton: 'Layers',
     fitMapButton: 'Fit map',
@@ -2324,6 +2373,7 @@ function getStatusInfo(stationCode, dateString) {
 function applyStaticTranslations() {
   const keys = [
     'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton', 'actionsMenuLabel',
+    'crossSectionTableTitle', 'crossSectionTableNote', 'thSurveyDate', 'thThalweg', 'thLeftBank', 'thRightBank', 'thBankfull', 'thDepth', 'ratingTableTitle', 'ratingTableNote', 'thValidFrom', 'thValidTo', 'thSegment', 'thConsistency', 'thStageRange', 'thEquation', 'exportCrossSectionTableCsvButton', 'exportRatingTableCsvButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
@@ -3069,11 +3119,19 @@ function hydrateStationData(raw) {
   const hydrated = structuredClone(raw);
   const startDate = raw.daily.start_date;
   hydrated.hydraulic = {
-    crossSections: (raw.hydraulic?.cross_sections || []).map(([date, id, points]) => ({
-      date,
-      id,
-      points: (points || []).map(([x, y]) => ({ x: Number(x), y: Number(y) })),
-    })),
+    crossSections: (raw.hydraulic?.cross_sections || []).map(([date, id, points, geometry]) => {
+      const profile = (points || []).map(([x, y]) => ({ x: Number(x), y: Number(y) }));
+      // Exported geometry comes from the full profile; the points are simplified to 180.
+      const [thalweg, leftBank, rightBank, bankfull, flags] = geometry || [];
+      return {
+        date,
+        id,
+        points: profile,
+        geometry: geometry
+          ? { thalweg, leftBank, rightBank, bankfull, depth: bankfull != null && thalweg != null ? bankfull - thalweg : null, flags: flags || '' }
+          : { ...(bankfullFromProfile(profile) || {}), flags: '' },
+      };
+    }),
     ratingCurves: (raw.hydraulic?.rating_curves || []).map(([validFrom, validTo, year, curveId, segmentId, stageMin, stageMax, coefficientA, coefficientH0, coefficientN]) => ({
       validFrom,
       validTo,
@@ -3981,6 +4039,71 @@ function renderSeasonality(stationData) {
   });
 }
 
+function crossSectionTableRows(stationData) {
+  return (stationData.hydraulic?.crossSections || [])
+    .map((section) => ({ date: section.date, id: section.id, ...section.geometry }))
+    .sort((left, right) => String(left.date || '').localeCompare(String(right.date || '')));
+}
+
+function ratingTableRows(stationData) {
+  return (stationData.hydraulic?.ratingCurves || [])
+    .map((curve) => ({ ...curve, ...parseRatingSegmentId(curve.segmentId) }))
+    .sort((left, right) => String(left.validFrom || '').localeCompare(String(right.validFrom || ''))
+      || String(left.curveId || '').localeCompare(String(right.curveId || ''))
+      || (left.segment || 0) - (right.segment || 0));
+}
+
+const coefficientFormat = (value) => formatNumber(value, Math.min(4, (String(value).split('.')[1] || '').length));
+
+function consistencyLabel(level) {
+  if (level === 2) return text('consistencyChecked');
+  if (level === 1) return text('consistencyRaw');
+  return '-';
+}
+
+function segmentLabel(row) {
+  return row.segment ? `${row.segment} ${text('segmentOf')} ${row.segments}` : '-';
+}
+
+function renderHydraulicTables(stationData) {
+  const sectionBody = byId('crossSectionTableBody');
+  if (sectionBody) {
+    const rows = crossSectionTableRows(stationData);
+    const cm = (value) => (value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(value, 0));
+    sectionBody.innerHTML = rows.length
+      ? rows.map((row) => `<tr><td>${formatShortDate(row.date)}</td><td>${cm(row.thalweg)}</td><td>${cm(row.leftBank)}</td><td>${cm(row.rightBank)}</td><td>${row.bankfull == null ? `- <small>(${text('noBankfull')})</small>` : cm(row.bankfull)}</td><td>${cm(row.depth)}</td></tr>`).join('')
+      : '<tr><td colspan="6">-</td></tr>';
+  }
+  const ratingBody = byId('ratingTableBody');
+  if (ratingBody) {
+    const rows = ratingTableRows(stationData);
+    ratingBody.innerHTML = rows.length
+      ? rows.map((row) => {
+        const equation = ratingEquationParts(row.coefficientA, row.coefficientH0, row.coefficientN, coefficientFormat);
+        return `<tr><td>${formatShortDate(row.validFrom)}</td><td>${row.validTo ? formatShortDate(row.validTo) : text('openEnded')}</td><td>${segmentLabel(row)}</td><td>${consistencyLabel(row.consistencyLevel)}</td><td>${formatNumber(row.stageMin, 0)}–${formatNumber(row.stageMax, 0)}</td><td>${equation.base}<sup>${equation.exponent}</sup></td></tr>`;
+      }).join('')
+      : '<tr><td colspan="6">-</td></tr>';
+  }
+}
+
+function crossSectionTableCsvRows(stationData) {
+  return [
+    ['survey_date', 'cross_section_id', 'thalweg_cm', 'left_bank_cm', 'right_bank_cm', 'bankfull_stage_cm', 'depth_thalweg_to_bankfull_cm', 'bankfull_flags'],
+    ...crossSectionTableRows(stationData).map((row) => [row.date, row.id, row.thalweg, row.leftBank, row.rightBank, row.bankfull, row.depth, row.flags || '']),
+  ];
+}
+
+function ratingTableCsvRows(stationData) {
+  return [
+    ['valid_from', 'valid_to', 'rating_curve_id', 'rating_curve_segment_id', 'segment', 'segments', 'consistency_level', 'stage_min_cm', 'stage_max_cm', 'coefficient_a', 'coefficient_h0_m', 'coefficient_n', 'equation'],
+    ...ratingTableRows(stationData).map((row) => [
+      row.validFrom, row.validTo, row.curveId, row.segmentId, row.segment, row.segments, row.consistencyLevel,
+      row.stageMin, row.stageMax, row.coefficientA, row.coefficientH0, row.coefficientN,
+      `Q = ${row.coefficientA} * (H - ${row.coefficientH0})^${row.coefficientN}`,
+    ]),
+  ];
+}
+
 function renderEventsTable(stationData) {
   const body = byId('eventTableBody');
   body.innerHTML = '';
@@ -4096,6 +4219,7 @@ function renderEmptySelection() {
   byId('qaFlags').innerHTML = '';
   byId('eventMetrics').innerHTML = '';
   byId('eventTableBody').innerHTML = '';
+  ['crossSectionTableBody', 'ratingTableBody'].forEach((id) => { if (byId(id)) byId(id).innerHTML = ''; });
   byId('crossSectionChart').hidden = true;
   byId('crossSectionEmpty').hidden = true;
   destroyChart('crossSectionChart');
@@ -4139,6 +4263,7 @@ async function selectStation(stationCode) {
     renderMetadata(data);
     renderEventSummary(data);
     renderEventsTable(data);
+    renderHydraulicTables(data);
     renderQaSection(data);
     renderStationCharts(data);
     telemetry.measure('station.loaded', startedAt, {
@@ -4665,9 +4790,11 @@ function buildStationCsvEntries(stationData) {
       '',
       'Arquivos incluídos:',
       '- metadata_summary.csv: metadados e resumo da estação na data selecionada.',
-      '- daily_timeseries.csv: série diária com status, limiares e vazão estimada pela curva-chave mais recente.',
+      '- daily_timeseries.csv: série diária com status, limiares e vazão estimada pela curva-chave válida em cada dia (ou a mais recente, quando nenhuma é válida; ver rating_curve_valid_on_date).',
       '- threshold_intervals.csv: intervalos dinâmicos de limiar usados na reconstrução.',
       '- cross_sections.csv: pontos de cada seção transversal plotada.',
+      '- cross_section_surveys.csv: data, talvegue, margens, cota de margens plenas e profundidade de cada levantamento.',
+      '- rating_curve_segments.csv: validade, faixa de cota e equação de cada trecho de curva-chave.',
       '- rating_curve_lines.csv: pontos das curvas-chave plotadas no gráfico.',
       '- rating_curve_threshold_points.csv: pontos dinâmicos de limiar no espaço vazão-cota.',
       '- annual_maxima_thresholds.csv: base do gráfico de máximos anuais e limiares.',
@@ -4679,9 +4806,11 @@ function buildStationCsvEntries(stationData) {
       '',
       'Included files:',
       '- metadata_summary.csv: station metadata and selected-day summary.',
-      '- daily_timeseries.csv: daily series with status, thresholds, and discharge estimated from the latest rating curve.',
+      '- daily_timeseries.csv: daily series with status, thresholds, and discharge estimated with the rating curve valid on each day (or the most recent one when none is valid; see rating_curve_valid_on_date).',
       '- threshold_intervals.csv: dynamic threshold intervals used in the reconstruction.',
       '- cross_sections.csv: points for each plotted cross section.',
+      '- cross_section_surveys.csv: date, thalweg, banks, bankfull stage, and depth of each survey.',
+      '- rating_curve_segments.csv: validity, stage range, and equation of each rating-curve segment.',
       '- rating_curve_lines.csv: points for the rating-curve chart.',
       '- rating_curve_threshold_points.csv: dynamic threshold points in discharge-stage space.',
       '- annual_maxima_thresholds.csv: data behind the annual-maxima and threshold chart.',
@@ -4694,6 +4823,8 @@ function buildStationCsvEntries(stationData) {
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/daily_timeseries.csv`, text: buildCsv(dailySeriesCsvRows(stationData)) },
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/threshold_intervals.csv`, text: buildCsv(thresholdIntervalsCsvRows(stationData)) },
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/cross_sections.csv`, text: buildCsv(crossSectionsCsvRows(stationData)) },
+    { name: `limiar_station_${stationCode}_${selectedDateSlug}/cross_section_surveys.csv`, text: buildCsv(crossSectionTableCsvRows(stationData)) },
+    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_segments.csv`, text: buildCsv(ratingTableCsvRows(stationData)) },
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_lines.csv`, text: buildCsv(ratingCurveLinesCsvRows(stationData)) },
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_threshold_points.csv`, text: buildCsv(ratingCurveThresholdPointsCsvRows(stationData)) },
     { name: `limiar_station_${stationCode}_${selectedDateSlug}/annual_maxima_thresholds.csv`, text: buildCsv(annualEvidenceCsvRows(stationData)) },
@@ -4771,6 +4902,8 @@ const STATION_CSV_EXPORTS = {
   exportEvidenceCsvButton: { slug: 'annual_evidence', rows: annualEvidenceCsvRows },
   exportSeasonalityCsvButton: { slug: 'seasonality', rows: seasonalityCsvRows },
   exportEventsCsvButton: { slug: 'events', rows: eventsCsvRows },
+  exportCrossSectionTableCsvButton: { slug: 'cross_section_surveys', rows: crossSectionTableCsvRows },
+  exportRatingTableCsvButton: { slug: 'rating_curve_segments', rows: ratingTableCsvRows },
 };
 
 function exportStationCsv(kind) {
@@ -4870,6 +5003,7 @@ function reportRun(text, options = {}) {
     bold: Boolean(options.bold),
     italics: Boolean(options.italics),
     subScript: Boolean(options.subScript),
+    superScript: Boolean(options.superScript),
     color: options.color || REPORT_THEME.text,
     size: options.size || REPORT_SIZE.body,
     font: options.bold ? REPORT_FONT.bold : REPORT_FONT.body,
@@ -4914,6 +5048,7 @@ function reportCell(text, options = {}) {
         color: options.color || REPORT_THEME.text,
         after: 0,
         line: 260,
+        children: options.runs,
       }),
     ],
   });
@@ -5268,6 +5403,49 @@ async function exportStationReport() {
     const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;
     const footerText = `${state.selectedData.metadata.station_name} (${state.selectedData.metadata.station_code}) · ${formatDate(state.selectedDate)}`;
 
+    // Rating-curve segments and cross-section surveys, as on the station page.
+    const hydraulicTables = () => {
+      const headerCells = (labels, widths) => new docx.TableRow({
+        tableHeader: true,
+        children: labels.map((label, index) => reportCell(label, { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: widths[index] })),
+      });
+      const cm = (value) => (value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(value, 0));
+      const ratingWidths = [1250, 1250, 800, 1300, 1600, 2826];
+      const ratingRows = ratingTableRows(state.selectedData).map((row) => {
+        const equation = ratingEquationParts(row.coefficientA, row.coefficientH0, row.coefficientN, coefficientFormat);
+        const size = REPORT_SIZE.table;
+        return new docx.TableRow({
+          children: [
+            formatShortDate(row.validFrom),
+            row.validTo ? formatShortDate(row.validTo) : text('openEnded'),
+            segmentLabel(row),
+            consistencyLabel(row.consistencyLevel),
+            `${formatNumber(row.stageMin, 0)}–${formatNumber(row.stageMax, 0)}`,
+          ].map((cell, index) => reportCell(cell, { width: ratingWidths[index] })).concat(reportCell('', {
+            width: ratingWidths[5],
+            runs: [reportRun(equation.base, { size }), reportRun(equation.exponent, { size, superScript: true })],
+          })),
+        });
+      });
+      const sectionWidths = [1500, 1400, 1450, 1450, 1600, 1626];
+      const sectionRows = crossSectionTableRows(state.selectedData).map((row) => new docx.TableRow({
+        children: [formatShortDate(row.date), cm(row.thalweg), cm(row.leftBank), cm(row.rightBank), cm(row.bankfull), cm(row.depth)]
+          .map((cell, index) => reportCell(cell, { width: sectionWidths[index] })),
+      }));
+      return [
+        ...(ratingRows.length ? [
+          subheading(text('ratingTableTitle')),
+          reportParagraph(text('ratingTableNote'), { color: REPORT_THEME.muted, size: REPORT_SIZE.caption, after: 80 }),
+          reportTable([headerCells(['thValidFrom', 'thValidTo', 'thSegment', 'thConsistency', 'thStageRange', 'thEquation'].map(text), ratingWidths), ...ratingRows], ratingWidths),
+        ] : []),
+        ...(sectionRows.length ? [
+          subheading(text('crossSectionTableTitle')),
+          reportParagraph(text('crossSectionTableNote'), { color: REPORT_THEME.muted, size: REPORT_SIZE.caption, after: 80 }),
+          reportTable([headerCells(['thSurveyDate', 'thThalweg', 'thLeftBank', 'thRightBank', 'thBankfull', 'thDepth'].map(text), sectionWidths), ...sectionRows], sectionWidths),
+        ] : []),
+      ];
+    };
+
     const buildDocument = (useNative) => new docx.Document({
       styles: {
         default: {
@@ -5316,6 +5494,7 @@ async function exportStationReport() {
         ]),
         reportSection(report.qaSection, footerText, [
           heading(report.qaSection),
+          ...hydraulicTables(),
           reportParagraph(qaFlagsText, {
             color: REPORT_THEME.muted,
             after: 120,
@@ -5490,6 +5669,7 @@ function wireEvents() {
         renderMetadata(state.selectedData);
         renderEventSummary(state.selectedData);
         renderEventsTable(state.selectedData);
+        renderHydraulicTables(state.selectedData);
         renderQaSection(state.selectedData);
         renderStationCharts(state.selectedData);
       } else {

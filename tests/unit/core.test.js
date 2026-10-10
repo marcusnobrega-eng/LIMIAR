@@ -171,3 +171,49 @@ describe('discharge from the rating curve for each day', () => {
     expect(core.validCurveDischarge([{ ...open[0], coefficientH0: 2 }], '1950-01-01', 100)).toEqual({ discharge: null, segment: null, validOnDate: null });
   });
 });
+
+describe('cross-section profiles', () => {
+  const profile = (pairs) => pairs.map(([x, y]) => ({ x, y }));
+
+  it('takes the lower bank as bankfull stage and measures depth from the thalweg', () => {
+    const result = core.bankfullFromProfile(profile([[0, 900], [10, 700], [20, 300], [30, 650], [40, 820], [50, 760]]));
+    expect(result).toEqual({ thalweg: 300, leftBank: 900, rightBank: 820, bankfull: 820, depth: 520 });
+  });
+
+  it('collapses repeated distances to the median elevation and sorts by distance', () => {
+    const result = core.bankfullFromProfile(profile([[40, 800], [0, 900], [20, 100], [20, 300], [20, 500], [10, 700], [30, 650]]));
+    expect(result.thalweg).toBe(300);
+    expect(result.bankfull).toBe(800);
+  });
+
+  it('uses the first of equally low vertices as the thalweg', () => {
+    const result = core.bankfullFromProfile(profile([[0, 900], [10, 800], [20, 300], [30, 300], [40, 700], [50, 750]]));
+    expect(result).toMatchObject({ leftBank: 900, rightBank: 750, bankfull: 750 });
+  });
+
+  it('rejects profiles that S3 rejects', () => {
+    expect(core.bankfullFromProfile(profile([[0, 900], [10, 300], [20, 800], [30, 850]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 300], [10, 900], [20, 800], [30, 850], [40, 870]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 900], [10, 800], [20, 700], [30, 300], [40, 850]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 500], [10, 500], [20, 500], [30, 500], [40, 500]]))).toBeNull();
+    expect(core.bankfullFromProfile([{ x: 0, y: 1 }, { x: null, y: 2 }, { x: 'a', y: 3 }, { x: 1, y: undefined }, null])).toBeNull();
+    expect(core.bankfullFromProfile(undefined)).toBeNull();
+  });
+});
+
+describe('rating-curve segments', () => {
+  it('reads the consistency level and segment number from the identifier', () => {
+    expect(core.parseRatingSegmentId('13880000__20160109000000__20231231000000__2__01_02__700__2289__1__1__NA__9_9319__0_21__2_2'))
+      .toEqual({ consistencyLevel: 2, segment: 1, segments: 2 });
+    expect(core.parseRatingSegmentId('x__y__z__1__03_11')).toEqual({ consistencyLevel: 1, segment: 3, segments: 11 });
+    expect(core.parseRatingSegmentId(null)).toEqual({ consistencyLevel: null, segment: null, segments: null });
+    expect(core.parseRatingSegmentId('a__b__c____bad')).toEqual({ consistencyLevel: null, segment: null, segments: null });
+  });
+
+  it('writes the equation with the sign of h0', () => {
+    expect(core.ratingEquationParts(9.9319, 0.21, 2.2)).toEqual({ base: 'Q = 9.9319 (H − 0.21)', exponent: '2.2' });
+    expect(core.ratingEquationParts(3.0152, -2.04, 2.5)).toEqual({ base: 'Q = 3.0152 (H + 2.04)', exponent: '2.5' });
+    expect(core.ratingEquationParts(1, 0, 2, (value) => value.toFixed(1)).base).toBe('Q = 1.0 (H − 0.0)');
+  });
+});
+
