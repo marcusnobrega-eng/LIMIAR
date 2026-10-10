@@ -32,7 +32,7 @@ test.describe('station report export', () => {
     const documentXml = entries.get('word/document.xml').toString('utf8');
 
     const pageMargins = [...documentXml.matchAll(/<w:pgMar [^>]*>/g)].map((match) => match[0]);
-    expect(pageMargins).toHaveLength(4);
+    expect(pageMargins).toHaveLength(5);
     for (const margins of pageMargins) {
       for (const side of ['top', 'right', 'bottom', 'left']) expect(margins).toContain(`w:${side}="1440"`);
       expect(margins).toContain('w:header="720"');
@@ -51,13 +51,23 @@ test.describe('station report export', () => {
     for (const width of tableGrids) expect(width).toBe(11906 - 2 * 1440);
 
     const headers = partsText(entries, /^word\/header\d+\.xml$/);
-    for (const title of ['Station summary', 'Station charts', 'Hydraulic panel and QA', 'All reconstructed station events']) {
+    for (const title of ['Station summary', 'Station charts', 'Hydraulic panel and QA', 'All reconstructed station events', 'Methods and uncertainty']) {
       expect(headers).toContain(title);
     }
     const footers = partsText(entries, /^word\/footer\d+\.xml$/);
     expect(footers).toContain('ITUPORANGA (83250000)');
     expect(footers).toContain('PAGE');
     expect(footers).toContain('NUMPAGES');
+  });
+
+  test('ends with a methods section that uses Word equations', async ({ page }) => {
+    const entries = await downloadReport(page, 'en');
+    const documentXml = entries.get('word/document.xml').toString('utf8');
+    expect(documentXml.match(/<m:oMath>/g)).toHaveLength(4);
+    expect(documentXml).toContain('two-year return discharge');
+    expect(documentXml).toContain('is not a warning service');
+    const methodsStart = documentXml.lastIndexOf('Methods and uncertainty');
+    expect(methodsStart).toBeGreaterThan(documentXml.indexOf('All reconstructed station events'));
   });
 
   test('prints chart text at 16 pt or larger', async ({ page }) => {
@@ -83,6 +93,7 @@ test.describe('station report export', () => {
     const headers = partsText(entries, /^word\/header\d+\.xml$/);
     expect(headers).toContain('Resumo da estação');
     expect(headers).toContain('Gráficos da estação');
+    expect(headers).toContain('Métodos e incerteza');
     const footers = partsText(entries, /^word\/footer\d+\.xml$/);
     expect(footers).toContain('Página');
   });
