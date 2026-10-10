@@ -2147,6 +2147,238 @@ body.modal-open {
   color: var(--muted);
 }
 
+/* Two-level timeline docked under the map. Ranges keep native keyboard and screen-reader behaviour.
+   The dock sits below the map rather than over it, so no stations are hidden. */
+@media (min-width: 921px) {
+  .map-stage {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--header-height));
+  }
+
+  .map-stage #map {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  .legend-card {
+    bottom: calc(18px + var(--timeline-dock-height, 0px));
+  }
+}
+
+.timeline-dock {
+  position: relative;
+  z-index: 700;
+  display: grid;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: 0 -6px 18px rgba(27, 45, 50, 0.06);
+}
+
+.timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.timeline-selected {
+  font-family: "Fraunces", serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.timeline-overview {
+  position: relative;
+  height: 46px;
+}
+
+.timeline-density,
+.timeline-window,
+.timeline-range-overview {
+  position: absolute;
+  top: 0;
+  height: 30px;
+}
+
+.timeline-density {
+  right: 3px;
+  left: 3px;
+  width: calc(100% - 6px);
+}
+
+.timeline-density path {
+  fill: rgba(21, 95, 120, 0.14);
+  stroke: rgba(21, 95, 120, 0.42);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline-window {
+  margin-left: 3px;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(21, 95, 120, 0.1);
+  pointer-events: none;
+  transition: left var(--motion-standard) var(--motion-enter);
+}
+
+.timeline-range {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.timeline-range-overview {
+  left: 0;
+}
+
+.timeline-range-overview::-webkit-slider-runnable-track {
+  height: 30px;
+}
+
+.timeline-range-overview::-webkit-slider-thumb {
+  appearance: none;
+  width: 6px;
+  height: 30px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.timeline-range-overview::-moz-range-thumb {
+  width: 6px;
+  height: 30px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.timeline-axis {
+  position: relative;
+  height: 14px;
+  color: var(--subtle);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-axis span {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.timeline-overview .timeline-axis {
+  position: absolute;
+  right: 3px;
+  bottom: 0;
+  left: 3px;
+}
+
+.timeline-overview .timeline-axis span {
+  transform: translateX(-50%);
+}
+
+.timeline-detail {
+  position: relative;
+}
+
+.timeline-months {
+  margin: 0 9px;
+}
+
+.timeline-months span {
+  padding-left: 4px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.timeline-months .is-year {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.timeline-range-detail {
+  --timeline-progress: 0%;
+  display: block;
+  height: 24px;
+  background:
+    linear-gradient(90deg, var(--accent) 0 var(--timeline-progress), rgba(21, 95, 120, 0.14) var(--timeline-progress) 100%) center / calc(100% - 18px) 6px no-repeat;
+}
+
+.timeline-range-detail::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 3px 8px rgba(21, 95, 120, 0.28);
+}
+
+.timeline-range-detail::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 3px 8px rgba(21, 95, 120, 0.28);
+}
+
+.timeline-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.timeline-bubble {
+  position: absolute;
+  bottom: calc(100% - 12px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.timeline-detail:hover .timeline-bubble,
+.timeline-detail:focus-within .timeline-bubble {
+  opacity: 1;
+}
+
+/* The header slider stays as the date control on narrow screens only. */
+@media (min-width: 921px) {
+  .date-timeline {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .timeline-dock {
+    display: none;
+  }
+}
+
 @media (max-width: 1220px) {
   .brand-copy small {
     display: none;
