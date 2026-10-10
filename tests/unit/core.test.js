@@ -120,3 +120,47 @@ describe('station report layout', () => {
     expect(core.scaleToWidth(1000, 333, 600)).toEqual({ width: 600, height: 200 });
   });
 });
+
+describe('discharge from the rating curve valid on each day', () => {
+  // Segments from ANA station 13880000 (Canutama).
+  const curves = [
+    { validFrom: '1997-01-01', validTo: '2016-01-08', stageMin: 1505, stageMax: 2550, coefficientA: 72.0109, coefficientH0: 4.58, coefficientN: 1.7, segmentId: '1997-b' },
+    { validFrom: '2016-01-09', validTo: '2023-12-31', stageMin: 700, stageMax: 2289, coefficientA: 9.9319, coefficientH0: 0.21, coefficientN: 2.2, segmentId: '2016-a' },
+    { validFrom: '2016-01-09', validTo: '2023-12-31', stageMin: 2289, stageMax: 2550, coefficientA: 93.1542, coefficientH0: 8.14, coefficientN: 1.72, segmentId: '2016-b' },
+    { validFrom: '2024-01-01', validTo: '2025-12-31', stageMin: 2290, stageMax: 2600, coefficientA: 42.8607, coefficientH0: 9.18, coefficientN: 2.057, segmentId: '2024-b' },
+  ];
+
+  it('uses the segment valid on the date that contains the stage', () => {
+    expect(core.ratingSegmentForDate(curves, '2018-03-01', 1200).segmentId).toBe('2016-a');
+    expect(core.ratingSegmentForDate(curves, '2018-03-01', 2400).segmentId).toBe('2016-b');
+    expect(core.ratingSegmentForDate(curves, '2024-06-01', 2400).segmentId).toBe('2024-b');
+    expect(core.validCurveDischarge(curves, '2018-03-01', 1200).discharge).toBeCloseTo(9.9319 * (12 - 0.21) ** 2.2, 6);
+  });
+
+  it('returns nothing before the first curve or outside every valid stage range', () => {
+    expect(core.ratingSegmentForDate(curves, '1976-02-27', 2353)).toBeNull();
+    expect(core.ratingSegmentForDate(curves, '2024-06-01', 1200)).toBeNull();
+    expect(core.ratingSegmentForDate(curves, '2010-01-01', 1000)).toBeNull();
+    expect(core.validCurveDischarge(curves, '1976-02-27', 2353)).toEqual({ discharge: null, segment: null });
+  });
+
+  it('prefers the most recent start when curves overlap', () => {
+    const overlapping = [
+      { validFrom: '2000-01-01', validTo: '2010-12-31', stageMin: 0, stageMax: 500, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'older' },
+      { validFrom: '2005-01-01', validTo: '2010-12-31', stageMin: 0, stageMax: 500, coefficientA: 2, coefficientH0: 0, coefficientN: 2, segmentId: 'newer' },
+    ];
+    expect(core.ratingSegmentForDate(overlapping, '2006-01-01', 100).segmentId).toBe('newer');
+    expect(core.ratingSegmentForDate(overlapping, '2003-01-01', 100).segmentId).toBe('older');
+  });
+
+  it('ignores segments without stage bounds and missing inputs', () => {
+    const open = [{ validFrom: null, validTo: null, stageMin: 0, stageMax: 500, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'open' }];
+    expect(core.ratingSegmentForDate(open, '1950-01-01', 100).segmentId).toBe('open');
+    expect(core.ratingSegmentForDate([{ ...open[0], stageMin: null }], '1950-01-01', 100)).toBeNull();
+    expect(core.ratingSegmentForDate(open, '1950-01-01', null)).toBeNull();
+    expect(core.ratingSegmentForDate(open, '', 100)).toBeNull();
+    expect(core.ratingSegmentForDate(undefined, '1950-01-01', 100)).toBeNull();
+    expect(core.validCurveDischarge([{ ...open[0], coefficientH0: 2 }], '1950-01-01', 100)).toEqual({ discharge: null, segment: null });
+  });
+});
+

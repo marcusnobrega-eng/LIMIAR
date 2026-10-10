@@ -4,13 +4,14 @@ import {
   quantileFromSorted,
   ratingDischarge,
   ratingStageFromDischarge,
+  validCurveDischarge,
   REPORT_MIN_CHART_FONT_PT,
   REPORT_PAGE,
   reportFigureLayout,
   reportTextWidthPt,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=3';
+} from './core.js?v=4';
 
 const STATUS_MAP = {
   n: 'normal',
@@ -1137,21 +1138,6 @@ function isFiniteNumber(value) {
 
 function curveKey(curveId, segmentId) {
   return `${curveId || ''}||${segmentId || ''}`;
-}
-
-function latestRatingCurve(stationData) {
-  const curves = (stationData.hydraulic?.ratingCurves || []).filter((curve) =>
-    curve
-    && isFiniteNumber(curve.coefficientA)
-    && isFiniteNumber(curve.coefficientH0)
-    && isFiniteNumber(curve.coefficientN)
-  );
-  if (!curves.length) return null;
-  return curves.slice().sort((left, right) => {
-    const leftKey = left.validTo || left.validFrom || `${left.year || 0}`;
-    const rightKey = right.validTo || right.validFrom || `${right.year || 0}`;
-    return String(leftKey).localeCompare(String(rightKey));
-  }).at(-1);
 }
 
 function crossSectionBand(stationData) {
@@ -3315,21 +3301,11 @@ function renderTimeseriesChart(stationData) {
   canvas.hidden = false;
   emptyNode.hidden = true;
   const valueType = stationData.summary.threshold_value_type;
-  const latestCurve = valueType === 'stage_cm' ? latestRatingCurve(stationData) : null;
+  const curves = valueType === 'stage_cm' ? (stationData.hydraulic?.ratingCurves || []) : [];
   const labels = rows.map((row) => row.date);
   const values = rows.map((row) => row.observed_value);
-  const derivedDischarge = latestCurve
-    ? rows.map((row) => {
-      if (!isFiniteNumber(row.observed_value)) return null;
-      const stage = Number(row.observed_value);
-      const withinCurveBounds = (
-        !isFiniteNumber(latestCurve.stageMin)
-        || !isFiniteNumber(latestCurve.stageMax)
-        || (stage >= Number(latestCurve.stageMin) && stage <= Number(latestCurve.stageMax))
-      );
-      if (!withinCurveBounds) return null;
-      return ratingDischarge(stage, latestCurve.coefficientA, latestCurve.coefficientH0, latestCurve.coefficientN);
-    })
+  const derivedDischarge = curves.length
+    ? rows.map((row) => validCurveDischarge(curves, row.date, row.observed_value).discharge)
     : [];
   const hasDerivedDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
   const normalizedThresholdRows = rows.map((row) => {
@@ -3404,10 +3380,10 @@ function renderTimeseriesChart(stationData) {
           pointBorderColor: '#fff',
           pointBorderWidth: 1.5,
         },
-        ...(latestCurve && hasDerivedDischarge ? [{
+        ...(hasDerivedDischarge ? [{
           label: state.lang === 'pt'
-            ? `Vazão estimada pela curva-chave mais recente (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`
-            : `Estimated discharge from the latest rating curve (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`,
+            ? 'Vazão estimada pela curva-chave válida em cada dia'
+            : 'Estimated discharge from the rating curve valid on each day',
           data: derivedDischarge,
           yAxisID: 'yDischarge',
           borderColor: CHART_THEME.discharge,
@@ -3439,7 +3415,7 @@ function renderTimeseriesChart(stationData) {
       scales: {
         x: chartScale({ maxTicksLimit: 8 }),
         y: chartScale({ title: TEXT[state.lang].units[valueType] }),
-        ...(latestCurve && hasDerivedDischarge ? {
+        ...(hasDerivedDischarge ? {
           yDischarge: {
             ...chartScale({
               title: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)',
@@ -3453,7 +3429,11 @@ function renderTimeseriesChart(stationData) {
       },
     },
   });
-  byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}`;
+  // Say so when the station has rating curves but none is valid for the plotted days.
+  const noValidCurve = curves.length && !hasDerivedDischarge
+    ? ` · ${state.lang === 'pt' ? 'sem curva-chave válida neste período' : 'no rating curve valid for this period'}`
+    : '';
+  byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}${noValidCurve}`;
 }
 
 function renderCrossSectionChart(stationData) {
@@ -4399,7 +4379,7 @@ function stationMetadataCsvRows(stationData) {
 }
 
 function dailySeriesCsvRows(stationData) {
-  const latestCurve = stationData.summary.threshold_value_type === 'stage_cm' ? latestRatingCurve(stationData) : null;
+  const curves = stationData.summary.threshold_value_type === 'stage_cm' ? (stationData.hydraulic?.ratingCurves || []) : [];
   const rows = [[
     'date',
     'observed_value',
@@ -4414,7 +4394,8 @@ function dailySeriesCsvRows(stationData) {
     'threshold_source',
     'interval_start',
     'interval_end',
-    'estimated_discharge_latest_curve_m3s',
+    'estimated_discharge_m3s',
+    'rating_curve_segment_id',
   ]];
   stationData.dailyRows.forEach((row) => {
     const interval = findIntervalForDate(stationData, row.date);
@@ -4423,9 +4404,8 @@ function dailySeriesCsvRows(stationData) {
       interval ? interval.flood : stationData.summary.threshold_value,
       interval ? interval.severe : null,
     );
-    const estimatedDischarge = latestCurve && isFiniteNumber(row.observed_value)
-      ? ratingDischarge(row.observed_value, latestCurve.coefficientA, latestCurve.coefficientH0, latestCurve.coefficientN)
-      : null;
+    const estimate = curves.length ? validCurveDischarge(curves, row.date, row.observed_value) : { discharge: null, segment: null };
+    const estimatedDischarge = estimate.discharge;
     rows.push([
       row.date,
       row.observed_value,
@@ -4441,6 +4421,7 @@ function dailySeriesCsvRows(stationData) {
       interval?.startDate || '',
       interval?.endDate || '',
       estimatedDischarge,
+      estimate.segment?.segmentId || '',
     ]);
   });
   return rows;
@@ -5187,7 +5168,7 @@ async function exportStationReport() {
 
     // The discharge axis is drawn only when plotted stages fall inside the latest curve's range.
     const timeseriesCaption = state.charts.timeseriesChart?.scales?.yDischarge
-      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
+      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia.' : 'The right axis shows discharge estimated with the rating curve valid on each day.'}`
       : report.chartCaption;
 
     const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;

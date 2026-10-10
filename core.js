@@ -27,6 +27,30 @@ export function ratingStageFromDischarge(dischargeM3s, coefficientA, coefficient
     return stageM * 100;
 }
 
+// The segment valid on the date whose stage range contains the stage, as in Supplementary
+// Section S4. The latest start date wins when curves overlap. Unlike the threshold pipeline,
+// there is no fallback to curves from other periods: without a valid curve the result is null.
+export function ratingSegmentForDate(curves, dateString, stageCm) {
+    const stage = Number(stageCm);
+    if (stageCm == null || !Number.isFinite(stage) || !dateString) return null;
+    let selected = null;
+    (curves || []).forEach((curve) => {
+      if (!Number.isFinite(curve.stageMin) || !Number.isFinite(curve.stageMax)) return;
+      if (stage < curve.stageMin || stage > curve.stageMax) return;
+      if (curve.validFrom && dateString < curve.validFrom) return;
+      if (curve.validTo && dateString > curve.validTo) return;
+      if (!selected || String(curve.validFrom || '') > String(selected.validFrom || '')) selected = curve;
+    });
+    return selected;
+}
+
+export function validCurveDischarge(curves, dateString, stageCm) {
+    const segment = ratingSegmentForDate(curves, dateString, stageCm);
+    if (!segment) return { discharge: null, segment: null };
+    const discharge = ratingDischarge(stageCm, segment.coefficientA, segment.coefficientH0, segment.coefficientN);
+    return { discharge, segment: discharge == null ? null : segment };
+}
+
 export function normalizeThresholdTriplet(alert, flood, severe) {
     let normalizedAlert = alert ?? null;
     const normalizedFlood = flood ?? null;
