@@ -161,6 +161,19 @@ describe('discharge from the rating curve for each day', () => {
     expect(core.ratingSegmentForDate(overlapping, '2020-01-01', 100)).toEqual({ segment: overlapping[1], validOnDate: false });
   });
 
+  it('breaks ties between curves with the same start by the longest validity', () => {
+    const tied = [
+      { validFrom: '2024-01-01', validTo: '2024-12-31', stageMin: 0, stageMax: 900, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'short' },
+      { validFrom: '2024-01-01', validTo: '2026-06-30', stageMin: 0, stageMax: 900, coefficientA: 3, coefficientH0: 0, coefficientN: 2, segmentId: 'long' },
+      { validFrom: '2024-01-01', validTo: '2025-06-30', stageMin: 0, stageMax: 900, coefficientA: 2, coefficientH0: 0, coefficientN: 2, segmentId: 'middle' },
+    ];
+    expect(core.ratingSegmentForDate(tied, '2024-06-01', 686).segment.segmentId).toBe('long');
+    expect(core.ratingSegmentForDate([...tied].reverse(), '2024-06-01', 686).segment.segmentId).toBe('long');
+    expect(core.ratingSegmentForDate(tied, '2027-01-01', 686)).toEqual({ segment: tied[1], validOnDate: false });
+    const open = { ...tied[0], validTo: null, segmentId: 'open' };
+    expect(core.ratingSegmentForDate([...tied, open], '2024-06-01', 686).segment.segmentId).toBe('open');
+  });
+
   it('ignores segments without stage bounds and missing inputs', () => {
     const open = [{ validFrom: null, validTo: null, stageMin: 0, stageMax: 500, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'open' }];
     expect(core.ratingSegmentForDate(open, '1950-01-01', 100)).toEqual({ segment: open[0], validOnDate: true });

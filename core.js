@@ -29,14 +29,19 @@ export function ratingStageFromDischarge(dischargeM3s, coefficientA, coefficient
 
 // Same rule as the threshold pipeline (Supplementary Section S4): among segments whose stage
 // range contains the stage, prefer those valid on the date; if none is valid on the date, use
-// the most recent one. The latest start date wins in both cases. `validOnDate` reports which.
+// the most recent one. The latest start date wins in both cases, and among curves that start
+// on the same date the one valid for longest wins. `validOnDate` reports which case applied.
 export function ratingSegmentForDate(curves, dateString, stageCm) {
     const stage = Number(stageCm);
     if (stageCm == null || !Number.isFinite(stage) || !dateString) return null;
-    const latest = (candidates) => candidates.reduce(
-      (best, curve) => (!best || String(curve.validFrom || '') > String(best.validFrom || '') ? curve : best),
-      null,
-    );
+    const latest = (candidates) => candidates.reduce((best, curve) => {
+      if (!best) return curve;
+      const start = String(curve.validFrom || '');
+      const bestStart = String(best.validFrom || '');
+      if (start !== bestStart) return start > bestStart ? curve : best;
+      // Same start: the longer validity ends later; an open end counts as the longest.
+      return String(curve.validTo || '9999-12-31') > String(best.validTo || '9999-12-31') ? curve : best;
+    }, null);
     const eligible = (curves || []).filter((curve) => (
       Number.isFinite(curve.stageMin) && Number.isFinite(curve.stageMax)
       && stage >= curve.stageMin && stage <= curve.stageMax
