@@ -48,6 +48,36 @@ export function normalizeThresholdTriplet(alert, flood, severe) {
     };
 }
 
+// Word measures pages in twentieths of a point: A4 with 2.54 cm margins.
+export const REPORT_PAGE = {
+  width: 11906,
+  height: 16838,
+  margin: 1440,
+  headerFooter: 720,
+};
+
+export const REPORT_MIN_CHART_FONT_PT = 16;
+
+export function reportTextWidthPt(page = REPORT_PAGE) {
+  return (page.width - 2 * page.margin) / 20;
+}
+
+// One canvas unit equals one printed point, so a 16-unit chart font prints at 16 pt.
+// The docx library places images in 96-dpi pixels.
+export function reportFigureLayout(widthPt, heightPt, pixelsPerPoint = 4) {
+  return {
+    canvasWidth: widthPt,
+    canvasHeight: heightPt,
+    pixelRatio: pixelsPerPoint,
+    imageWidth: Math.round((widthPt * 96) / 72),
+    imageHeight: Math.round((heightPt * 96) / 72),
+  };
+}
+
+export function scaleToWidth(naturalWidth, naturalHeight, width) {
+  return { width, height: Math.round((width * naturalHeight) / naturalWidth) };
+}
+
 export function addDays(dateString, offset) {
     const dayNumber = Math.round(Date.parse(`${dateString}T00:00:00Z`) / 86400000);
     return new Date((dayNumber + Number(offset)) * 86400000).toISOString().slice(0, 10);
