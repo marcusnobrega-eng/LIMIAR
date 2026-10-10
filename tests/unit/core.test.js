@@ -248,3 +248,12 @@ describe('provisional (raw ANA) days', () => {
     expect(core.provisionalRuns([])).toEqual([]);
   });
 });
+
+describe('forecast timeline', () => {
+  it('spans the observed days and the forecast without gaps', () => {
+    expect(core.continuousDates(['2026-10-08', '2026-10-09'], ['2026-10-11', '2026-10-12'])).toEqual(['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12']);
+    expect(core.continuousDates(['2026-10-10'], ['2026-10-10'])).toEqual(['2026-10-10']);
+    expect(core.continuousDates([], ['2026-12-31', '2027-01-01'])).toEqual(['2026-12-31', '2027-01-01']);
+    expect(core.continuousDates([], [])).toEqual([]);
+  });
+});

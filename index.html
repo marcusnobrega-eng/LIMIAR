@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=22" />
   </head>
   <body class="app-loading">
     <header class="topbar">
@@ -259,6 +259,19 @@
               <div class="chart-empty" id="timeseriesEmpty" hidden>Sem série temporal disponível para esta estação.</div>
               <canvas id="timeseriesChart" height="260"></canvas>
             </div>
+          </section>
+
+          <section class="chart-card forecast-card" id="forecastCard" hidden>
+            <div class="section-head">
+              <div>
+                <h3 id="forecastTitle">Últimos 30 dias e previsão (experimental)</h3>
+                <span id="forecastSubtitle">-</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="forecastChart" height="260"></canvas>
+            </div>
+            <p class="chart-note" id="forecastNote"></p>
           </section>
 
           <section class="chart-card">
@@ -618,6 +631,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-  <script type="module" src="app.js?v=33"></script>
+  <script type="module" src="app.js?v=34"></script>
   </body>
 </html>

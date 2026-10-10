@@ -2,6 +2,7 @@ import {
   addDays,
   fileNamePart,
   bankfullFromProfile,
+  continuousDates,
   normalizeThresholdTriplet,
   parseRatingSegmentId,
   quantileFromSorted,
@@ -17,7 +18,7 @@ import {
   provisionalRuns,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=6';
+} from './core.js?v=7';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
@@ -102,6 +103,22 @@ const TEXT = {
     consistencyRaw: 'Bruta (1)',
     consistencyChecked: 'Consistida (2)',
     dataVersion: 'Versão dos dados',
+    forecast: {
+      title: 'Últimos 30 dias e previsão (experimental)',
+      issued: 'Previsão GloFAS emitida em',
+      modelNote: 'vazão de modelo, sem correção de viés',
+      observedDischarge: 'Vazão observada (telemetria ANA)',
+      observedStage: 'Cota observada (telemetria ANA)',
+      glofas: 'Previsão GloFAS (vazão de modelo)',
+      level: (years) => `GloFAS ${years} anos`,
+      limiarThreshold: 'Limiar de inundação LIMIAR',
+      issueDay: 'Emissão da previsão',
+      discharge: 'Vazão (m³/s)',
+      stage: 'Cota (cm)',
+      noTelemetry: 'Esta estação não tem telemetria da ANA; só a previsão é mostrada.',
+      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. Como a vazão do modelo não tem correção de viés, ela é comparada com os níveis de cheia do próprio GloFAS, e o limiar LIMIAR aparece só sobre os dias observados. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
+      officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> e o <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SACE/SGB</a>.',
+    },
     provisionalNote: (date) => `dados consistidos pela ANA em geral até ${date}; depois disso, dados brutos e provisórios`,
     provisionalDay: 'Dado bruto (provisório)',
     provisionalSeries: 'Dados brutos (provisórios)',
@@ -478,6 +495,22 @@ const TEXT = {
     consistencyRaw: 'Raw (1)',
     consistencyChecked: 'Consisted (2)',
     dataVersion: 'Data version',
+    forecast: {
+      title: 'Last 30 days and forecast (experimental)',
+      issued: 'GloFAS forecast issued',
+      modelNote: 'model discharge, not bias-corrected',
+      observedDischarge: 'Observed discharge (ANA telemetry)',
+      observedStage: 'Observed stage (ANA telemetry)',
+      glofas: 'GloFAS forecast (model discharge)',
+      level: (years) => `GloFAS ${years}-year`,
+      limiarThreshold: 'LIMIAR flood threshold',
+      issueDay: 'Forecast issue',
+      discharge: 'Discharge (m³/s)',
+      stage: 'Stage (cm)',
+      noTelemetry: 'This station has no ANA telemetry; only the forecast is shown.',
+      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. Model discharge is not bias-corrected, so it is compared with GloFAS’s own flood levels, and the LIMIAR threshold is drawn only over the observed days. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
+      officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> and <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SGB SACE</a>.',
+    },
     provisionalNote: (date) => `ANA consisted data typically through ${date}; raw, provisional data after that`,
     provisionalDay: 'Raw data (provisional)',
     provisionalSeries: 'Raw data (provisional)',
@@ -1117,6 +1150,8 @@ const state = {
   selectedCode: null,
   selectedData: null,
   stationCache: new Map(),
+  forecastCache: new Map(),
+  selectedForecast: null,
   charts: {},
   markersLayer: null,
   currentRange: '90',
@@ -3280,6 +3315,20 @@ function hydrateStationData(raw) {
   return hydrated;
 }
 
+// The daily forecast bundle is optional: without it the forecast card stays hidden.
+async function loadForecast(stationCode) {
+  if (state.forecastCache.has(stationCode)) return state.forecastCache.get(stationCode);
+  let forecast = null;
+  try {
+    const response = await fetch(`forecast/stations/${stationCode}.json`);
+    if (response.ok) forecast = await response.json();
+  } catch {
+    forecast = null;
+  }
+  state.forecastCache.set(stationCode, forecast);
+  return forecast;
+}
+
 async function loadStationData(stationCode) {
   if (state.stationCache.has(stationCode)) return state.stationCache.get(stationCode);
   const raw = await loadJson(`data/stations/${stationCode}.json`);
@@ -3408,12 +3457,153 @@ function destroyChart(id) {
 
 const STATION_CHART_RENDERERS = {
   timeseriesChart: renderTimeseriesChart,
+  forecastChart: renderForecastChart,
   crossSectionChart: renderCrossSectionChart,
   dynamicDailyChart: renderDynamicDailyChart,
   ratingCurveChart: renderRatingCurveChart,
   evidenceChart: renderEvidenceChart,
   seasonalityChart: renderSeasonality,
 };
+
+const GLOFAS_LEVELS = [
+  { years: 2, key: 'rp2', color: CHART_THEME.alert, dash: [6, 4] },
+  { years: 5, key: 'rp5', color: CHART_THEME.flood, dash: [4, 3] },
+  { years: 20, key: 'rp20', color: CHART_THEME.severe, dash: [2, 3] },
+];
+
+function renderForecastChart(stationData) {
+  const card = byId('forecastCard');
+  const forecast = state.selectedForecast?.station_code === stationData.metadata.station_code ? state.selectedForecast : null;
+  card.hidden = !forecast;
+  if (!forecast) {
+    destroyChart('forecastChart');
+    return;
+  }
+  const words = text('forecast');
+  const observed = forecast.observed || { dates: [], stage_cm: [], discharge_m3s: [] };
+  const glofas = forecast.glofas;
+  const labels = continuousDates(observed.dates, glofas.dates);
+  const byDate = (dates, values) => {
+    const lookup = new Map(dates.map((date, index) => [date, values?.[index]]));
+    return labels.map((date) => lookup.get(date) ?? null);
+  };
+  const observedDischarge = byDate(observed.dates, observed.discharge_m3s);
+  const observedStage = byDate(observed.dates, observed.stage_cm);
+  const forecastDischarge = byDate(glofas.dates, glofas.discharge_m3s);
+  const forecastDates = new Set(glofas.dates);
+  const observedDates = new Set(observed.dates);
+  const hasObservedDischarge = observedDischarge.some(isFiniteNumber);
+  const canShowStage = observedStage.some(isFiniteNumber);
+  const valueType = stationData.summary.threshold_value_type;
+  // LIMIAR's flood threshold belongs with the observations, so it is drawn only over observed days.
+  // A stage threshold is shown as discharge through the rating curve, as in the main time series.
+  // Stage gets its own axis only when that is not possible: no telemetered discharge, or a rating
+  // curve that does not reach the threshold stage.
+  const lastObserved = observed.dates[observed.dates.length - 1];
+  const interval = lastObserved ? findIntervalForDate(stationData, lastObserved) : null;
+  const flood = normalizeThresholdTriplet(interval?.alert ?? null, interval ? interval.flood : stationData.summary.threshold_value, interval?.severe ?? null).flood;
+  let limiarFlood = null;
+  let limiarAxis = null;
+  if (valueType !== 'stage_cm') {
+    if (hasObservedDischarge) [limiarFlood, limiarAxis] = [flood, 'y'];
+  } else if (isFiniteNumber(flood) && lastObserved) {
+    const discharge = hasObservedDischarge ? validCurveDischarge(stationData.hydraulic?.ratingCurves || [], lastObserved, flood).discharge : null;
+    if (isFiniteNumber(discharge)) [limiarFlood, limiarAxis] = [discharge, 'y'];
+    else if (canShowStage) [limiarFlood, limiarAxis] = [flood, 'yStage'];
+  }
+  const hasObservedStage = canShowStage && (!hasObservedDischarge || limiarAxis === 'yStage');
+  const limiarLine = labels.map((date) => (observedDates.has(date) && isFiniteNumber(limiarFlood) ? limiarFlood : null));
+
+  byId('forecastTitle').textContent = words.title;
+  byId('forecastSubtitle').textContent = `${words.issued} ${formatDate(glofas.issued)} · ${words.modelNote}`;
+  // Static, trusted text from TEXT; no station data goes into this markup.
+  byId('forecastNote').innerHTML = `${forecast.observed ? '' : `${words.noTelemetry} `}${words.note} ${words.officialLinks}`;
+
+  destroyChart('forecastChart');
+  state.charts.forecastChart = new Chart(byId('forecastChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        ...(hasObservedDischarge ? [{
+          label: words.observedDischarge,
+          data: observedDischarge,
+          borderColor: CHART_THEME.discharge,
+          pointRadius: 0,
+          borderWidth: 2.35,
+          tension: 0.12,
+        }] : []),
+        {
+          label: words.glofas,
+          data: forecastDischarge,
+          borderColor: CURVE_COLORS[7],
+          pointRadius: 0,
+          borderWidth: 2.2,
+          borderDash: [8, 4],
+          tension: 0.12,
+        },
+        ...GLOFAS_LEVELS.map((level) => {
+          const value = Number(glofas.flood_levels_m3s?.[level.key]);
+          return {
+            label: words.level(level.years),
+            data: labels.map((date) => (forecastDates.has(date) && Number.isFinite(value) ? value : null)),
+            borderColor: level.color,
+            pointRadius: 0,
+            borderWidth: 1.4,
+            borderDash: level.dash,
+            thresholdLabel: words.level(level.years),
+            directLabel: true,
+          };
+        }),
+        ...(hasObservedStage ? [{
+          label: words.observedStage,
+          data: observedStage,
+          yAxisID: 'yStage',
+          borderColor: CHART_THEME.stage,
+          pointRadius: 0,
+          borderWidth: 2.35,
+          tension: 0.12,
+        }] : []),
+        ...(limiarAxis ? [{
+          label: words.limiarThreshold,
+          data: limiarLine,
+          yAxisID: limiarAxis,
+          borderColor: CHART_THEME.flood,
+          pointRadius: 0,
+          borderWidth: 2,
+          stepped: true,
+        }] : []),
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      normalized: true,
+      interaction: { intersect: false, mode: 'index' },
+      layout: { padding: { top: 4 } },
+      plugins: chartPlugins({
+        legend: chartLegend({
+          filter(item, data) {
+            return data.datasets[item.datasetIndex]?.directLabel !== true;
+          },
+        }),
+        thresholdLabels: { enabled: true },
+        selectedDateLine: { value: glofas.issued },
+      }),
+      scales: {
+        x: chartScale({ maxTicksLimit: 8 }),
+        y: chartScale({ title: words.discharge }),
+        ...(hasObservedStage ? {
+          yStage: {
+            ...chartScale({ title: words.stage, position: 'right', tickColor: CHART_THEME.stage }),
+            grid: { ...chartScale().grid, drawOnChartArea: false },
+            title: { display: true, text: words.stage, color: CHART_THEME.stage, font: { size: 12, weight: '600' } },
+          },
+        } : {}),
+      },
+    },
+  });
+}
 
 function renderStationCharts(stationData, eager = false) {
   state.chartObserver?.disconnect();
@@ -4370,8 +4560,11 @@ async function selectStation(stationCode) {
   setRegionLoading('station', true);
   setAppProgress(72, text('loadingStation'), true);
   try {
-    const data = await loadStationData(stationCode);
+    const [data, forecast] = await Promise.all([loadStationData(stationCode), loadForecast(stationCode)]);
     state.selectedData = data;
+    state.selectedForecast = forecast;
+    // Shown before the charts render: the lazy renderer only sees cards that are on screen.
+    byId('forecastCard').hidden = !forecast;
     renderStatusCard(data);
     renderMetadata(data);
     renderEventSummary(data);
@@ -5694,7 +5887,7 @@ async function exportStationReport() {
 }
 
 const MAXIMIZABLE_CHARTS = [
-  'timeseriesChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
+  'timeseriesChart', 'forecastChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
   'seasonalityChart', 'dailyConditionsChart', 'dailyLatitudeChart', 'dailyLongitudeChart',
 ];
 const MAXIMIZE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';

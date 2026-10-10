@@ -255,3 +255,12 @@ export function provisionalRuns(flags) {
   });
   return runs;
 }
+
+// Every day from the first to the last date of either list, for a chart that joins the
+// observed past with a forecast.
+export function continuousDates(...lists) {
+  const dates = lists.flat().filter(Boolean).sort();
+  if (!dates.length) return [];
+  const span = Math.round((Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) - Date.parse(`${dates[0]}T00:00:00Z`)) / 86400000);
+  return Array.from({ length: span + 1 }, (_, offset) => addDays(dates[0], offset));
+}
