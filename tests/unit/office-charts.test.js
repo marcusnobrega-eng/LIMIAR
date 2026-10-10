@@ -125,6 +125,8 @@ describe('chart and workbook XML', () => {
     expect(xml).toContain('LIMIAR!$B$2:$B$5');
     expect(xml).toContain('<a:alpha val="55000"/>');
     expect(xml).toContain('<c:externalData r:id="rId1">');
+    expect(xml).toMatch(/<\/c:valAx><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"\/><\/a:solidFill><a:ln w="9525">.*<\/c:spPr><\/c:plotArea>/);
+    expect(xml.match(/<c:majorTickMark val="out"\/>/g)).toHaveLength(4);
   });
 
   it('writes logarithmic axes, hidden legend entries, and category charts', () => {

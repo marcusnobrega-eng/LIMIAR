@@ -16,7 +16,7 @@ import {
   scaleToWidth,
   summarizeDailyStations,
 } from './core.js?v=5';
-import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=1';
+import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
   n: 'normal',
@@ -1226,6 +1226,8 @@ const CHART_THEME = {
   selected: '#17272d',
 };
 
+const CHART_AXIS_COLOR = '#8c9a9f';
+
 const CURVE_COLORS = ['#173f5f', '#20639b', '#3caea3', '#7f8c58', '#d49a35', '#d66a4a', '#a43d59', '#663a70'];
 
 function chartLegend({ display = true, position = 'bottom', filter } = {}) {
@@ -1257,13 +1259,17 @@ function chartScale({ title, type, position, maxTicksLimit, beginAtZero, display
       padding: 7,
       font: { size: 11 },
     },
+    // Gridlines stay inside the plot; major tick marks point outward from every axis.
     grid: {
-      display: displayGrid,
+      display: true,
+      drawOnChartArea: displayGrid,
       color: CHART_THEME.grid,
-      tickLength: 0,
-      drawBorder: false,
+      drawTicks: true,
+      tickLength: 6,
+      tickColor: CHART_AXIS_COLOR,
+      tickWidth: 1,
     },
-    border: { display: false },
+    border: { display: true, color: CHART_AXIS_COLOR, width: 1 },
     ...(title ? {
       title: {
         display: true,
@@ -1368,6 +1374,33 @@ const thresholdLabelsPlugin = {
   },
 };
 
+// A white plotting area with a frame on all four sides, under and over the data respectively.
+const plotFramePlugin = {
+  id: 'plotFrame',
+  beforeDraw(chart, _args, options) {
+    if (options?.enabled === false || !chart.chartArea) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+    ctx.restore();
+  },
+  afterDraw(chart, _args, options) {
+    if (options?.enabled === false || !chart.chartArea) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.strokeStyle = CHART_AXIS_COLOR;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      Math.round(chartArea.left) + 0.5,
+      Math.round(chartArea.top) + 0.5,
+      Math.round(chartArea.right - chartArea.left) - 1,
+      Math.round(chartArea.bottom - chartArea.top) - 1,
+    );
+    ctx.restore();
+  },
+};
+
 const selectedDateLinePlugin = {
   id: 'selectedDateLine',
   afterDatasetsDraw(chart, _args, options) {
@@ -1393,7 +1426,7 @@ if (window.Chart?.register) {
   window.Chart.defaults.font.size = 12;
   window.Chart.defaults.elements.line.borderCapStyle = 'round';
   window.Chart.defaults.elements.line.borderJoinStyle = 'round';
-  window.Chart.register(thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
+  window.Chart.register(plotFramePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -3513,7 +3546,7 @@ function renderTimeseriesChart(stationData) {
               position: 'right',
               tickColor: CHART_THEME.discharge,
             }),
-            grid: { drawOnChartArea: false },
+            grid: { ...chartScale().grid, drawOnChartArea: false },
             title: { display: true, text: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)', color: CHART_THEME.discharge, font: { size: 12, weight: '600' } },
           },
         } : {}),
