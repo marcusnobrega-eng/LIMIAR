@@ -96,3 +96,27 @@ describe('daily station analysis', () => {
     expect(summary.longitudeBins.find((bin) => bin.start === -50)?.counts.extreme_flooding).toBe(1);
   });
 });
+
+describe('station report layout', () => {
+  it('uses A4 pages with 2.54 cm margins', () => {
+    expect(core.REPORT_PAGE).toEqual({ width: 11906, height: 16838, margin: 1440, headerFooter: 720 });
+    expect(core.reportTextWidthPt()).toBeCloseTo(451.3, 6);
+    expect(core.reportTextWidthPt({ width: 12240, margin: 1080 })).toBe(504);
+  });
+
+  it('draws charts at one canvas unit per printed point', () => {
+    const layout = core.reportFigureLayout(450, 300);
+    expect(layout).toEqual({ canvasWidth: 450, canvasHeight: 300, pixelRatio: 4, imageWidth: 600, imageHeight: 400 });
+    expect((layout.imageWidth * 72) / 96).toBe(layout.canvasWidth);
+    expect(core.reportFigureLayout(300, 145, 2)).toEqual({ canvasWidth: 300, canvasHeight: 145, pixelRatio: 2, imageWidth: 400, imageHeight: 193 });
+  });
+
+  it('keeps chart text at or above 16 pt', () => {
+    expect(core.REPORT_MIN_CHART_FONT_PT).toBe(16);
+  });
+
+  it('scales images to a target width without changing their shape', () => {
+    expect(core.scaleToWidth(1200, 800, 600)).toEqual({ width: 600, height: 400 });
+    expect(core.scaleToWidth(1000, 333, 600)).toEqual({ width: 600, height: 200 });
+  });
+});
