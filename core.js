@@ -103,3 +103,67 @@ export function summarizeDailyStations(rows) {
     stateRanking,
   };
 }
+
+export function dayNumber(dateString) {
+  return Math.round(Date.parse(`${dateString}T00:00:00Z`) / 86400000);
+}
+
+export function dateFromDayNumber(value) {
+  return new Date(Number(value) * 86400000).toISOString().slice(0, 10);
+}
+
+// A fixed-length window around the selected day, kept inside the record.
+export function timelineWindow(selectedDate, minDate, maxDate, lengthDays = 365) {
+  const low = dayNumber(minDate);
+  const high = dayNumber(maxDate);
+  const selected = Math.min(high, Math.max(low, dayNumber(selectedDate)));
+  const span = Math.min(lengthDays, high - low);
+  const start = Math.max(low, Math.min(selected - Math.floor(span / 2), high - span));
+  return { start: dateFromDayNumber(start), end: dateFromDayNumber(start + span) };
+}
+
+export function dateInWindow(dateString, window) {
+  return Boolean(window) && dateString >= window.start && dateString <= window.end;
+}
+
+// Number of stations whose record spans each year from firstYear to lastYear.
+export function yearlyStationCoverage(stations, firstYear, lastYear) {
+  const counts = Array.from({ length: lastYear - firstYear + 1 }, () => 0);
+  stations.forEach((station) => {
+    const start = Number(String(station.first_date).slice(0, 4));
+    const end = Number(String(station.last_date).slice(0, 4));
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    for (let year = Math.max(start, firstYear); year <= Math.min(end, lastYear); year += 1) {
+      counts[year - firstYear] += 1;
+    }
+  });
+  return counts;
+}
+
+export function monthStarts(startDate, endDate) {
+  const months = [];
+  let year = Number(startDate.slice(0, 4));
+  let month = Number(startDate.slice(5, 7));
+  if (startDate.slice(8, 10) !== '01') month += 1;
+  for (;;) {
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+    const value = `${year}-${String(month).padStart(2, '0')}-01`;
+    if (value > endDate) return months;
+    months.push(value);
+    month += 1;
+  }
+}
+
+// Moves by calendar months, keeping the day when possible (31 Jan + 1 month = 29 Feb in a leap year).
+export function addMonths(dateString, months) {
+  const year = Number(dateString.slice(0, 4));
+  const monthIndex = Number(dateString.slice(5, 7)) - 1 + Number(months);
+  const targetYear = year + Math.floor(monthIndex / 12);
+  const targetMonth = ((monthIndex % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const day = Math.min(Number(dateString.slice(8, 10)), lastDay);
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}

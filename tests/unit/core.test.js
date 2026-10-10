@@ -96,3 +96,52 @@ describe('daily station analysis', () => {
     expect(summary.longitudeBins.find((bin) => bin.start === -50)?.counts.extreme_flooding).toBe(1);
   });
 });
+
+describe('timeline', () => {
+  it('converts between dates and day numbers', () => {
+    expect(core.dayNumber('1970-01-02')).toBe(1);
+    expect(core.dateFromDayNumber(core.dayNumber('2020-02-29'))).toBe('2020-02-29');
+  });
+
+  it('centres a one-year window on the selected day', () => {
+    expect(core.timelineWindow('2020-07-01', '1911-01-27', '2025-12-31')).toEqual({ start: '2020-01-01', end: '2020-12-31' });
+  });
+
+  it('keeps the window inside the record', () => {
+    expect(core.timelineWindow('1911-02-01', '1911-01-27', '2025-12-31')).toEqual({ start: '1911-01-27', end: '1912-01-27' });
+    expect(core.timelineWindow('2025-12-01', '1911-01-27', '2025-12-31')).toEqual({ start: '2024-12-31', end: '2025-12-31' });
+    expect(core.timelineWindow('2030-01-01', '1911-01-27', '2025-12-31').end).toBe('2025-12-31');
+    expect(core.timelineWindow('2020-01-10', '2020-01-01', '2020-03-01')).toEqual({ start: '2020-01-01', end: '2020-03-01' });
+  });
+
+  it('tells whether a date lies in the window', () => {
+    const window = { start: '2020-01-01', end: '2020-12-31' };
+    expect(core.dateInWindow('2020-01-01', window)).toBe(true);
+    expect(core.dateInWindow('2020-12-31', window)).toBe(true);
+    expect(core.dateInWindow('2021-01-01', window)).toBe(false);
+    expect(core.dateInWindow('2019-12-31', window)).toBe(false);
+    expect(core.dateInWindow('2020-05-05', null)).toBe(false);
+  });
+
+  it('counts stations whose record spans each year', () => {
+    const stations = [
+      { first_date: '1999-05-01', last_date: '2001-02-01' },
+      { first_date: '2001-01-01', last_date: '2003-12-31' },
+      { first_date: null, last_date: '2002-01-01' },
+    ];
+    expect(core.yearlyStationCoverage(stations, 2000, 2002)).toEqual([1, 2, 1]);
+  });
+
+  it('lists the first day of each month inside a range', () => {
+    expect(core.monthStarts('2019-11-15', '2020-02-01')).toEqual(['2019-12-01', '2020-01-01', '2020-02-01']);
+    expect(core.monthStarts('2020-01-01', '2020-01-31')).toEqual(['2020-01-01']);
+  });
+
+  it('moves by calendar months', () => {
+    expect(core.addMonths('2020-01-02', -1)).toBe('2019-12-02');
+    expect(core.addMonths('2020-01-31', 1)).toBe('2020-02-29');
+    expect(core.addMonths('2019-01-31', 1)).toBe('2019-02-28');
+    expect(core.addMonths('2020-11-15', 14)).toBe('2022-01-15');
+    expect(core.addMonths('2020-03-10', -27)).toBe('2017-12-10');
+  });
+});

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
   </head>
   <body class="app-loading">
     <header class="topbar">
@@ -205,6 +205,26 @@
         <section class="floating-card legend-card" id="legendCard">
           <span class="eyebrow" id="legendTitle">Legenda</span>
           <div class="legend-items" id="legendItems"></div>
+        </section>
+        <section class="floating-card timeline-dock" id="timelineDock" aria-labelledby="timelineTitle">
+          <div class="timeline-head">
+            <span class="eyebrow" id="timelineTitle">Linha do tempo</span>
+            <strong class="timeline-selected" id="timelineSelected" aria-live="polite">-</strong>
+            <span class="timeline-note" id="timelineNote">Faixa sombreada: estações cujo registro abrange cada ano</span>
+          </div>
+          <div class="timeline-overview">
+            <svg class="timeline-density" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+              <path id="timelineDensityPath" d=""></path>
+            </svg>
+            <span class="timeline-window" id="timelineWindow" aria-hidden="true"></span>
+            <input id="timelineOverview" class="timeline-range timeline-range-overview" type="range" min="0" max="0" step="1" value="0" />
+            <div class="timeline-axis" id="timelineDecades" aria-hidden="true"></div>
+          </div>
+          <div class="timeline-detail">
+            <div class="timeline-axis timeline-months" id="timelineMonths" aria-hidden="true"></div>
+            <input id="timelineDetail" class="timeline-range timeline-range-detail" type="range" min="0" max="0" step="1" value="0" />
+            <output class="timeline-bubble" id="timelineBubble" for="timelineDetail" aria-hidden="true"></output>
+          </div>
         </section>
       </section>
 
@@ -581,6 +601,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-  <script type="module" src="app.js?v=21"></script>
+  <script type="module" src="app.js?v=22"></script>
   </body>
 </html>
