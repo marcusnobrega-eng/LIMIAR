@@ -3304,10 +3304,14 @@ function renderTimeseriesChart(stationData) {
   const curves = valueType === 'stage_cm' ? (stationData.hydraulic?.ratingCurves || []) : [];
   const labels = rows.map((row) => row.date);
   const values = rows.map((row) => row.observed_value);
-  const derivedDischarge = curves.length
-    ? rows.map((row) => validCurveDischarge(curves, row.date, row.observed_value).discharge)
-    : [];
-  const hasDerivedDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
+  // Days without a curve valid on the date use the most recent curve, as the threshold
+  // pipeline does, and are drawn as a separate, dotted series.
+  const estimates = curves.length ? rows.map((row) => validCurveDischarge(curves, row.date, row.observed_value)) : [];
+  const derivedDischarge = estimates.map((estimate) => (estimate.validOnDate ? estimate.discharge : null));
+  const fallbackDischarge = estimates.map((estimate) => (estimate.validOnDate === false ? estimate.discharge : null));
+  const hasValidDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
+  const hasFallbackDischarge = fallbackDischarge.some((value) => isFiniteNumber(value));
+  const hasDerivedDischarge = hasValidDischarge || hasFallbackDischarge;
   const normalizedThresholdRows = rows.map((row) => {
     const interval = findIntervalForDate(stationData, row.date);
     return normalizeThresholdTriplet(
@@ -3380,10 +3384,10 @@ function renderTimeseriesChart(stationData) {
           pointBorderColor: '#fff',
           pointBorderWidth: 1.5,
         },
-        ...(hasDerivedDischarge ? [{
+        ...(hasValidDischarge ? [{
           label: state.lang === 'pt'
-            ? 'Vazão estimada pela curva-chave válida em cada dia'
-            : 'Estimated discharge from the rating curve valid on each day',
+            ? 'Vazão estimada pela curva-chave válida na data'
+            : 'Estimated discharge, rating curve valid on the date',
           data: derivedDischarge,
           yAxisID: 'yDischarge',
           borderColor: CHART_THEME.discharge,
@@ -3392,7 +3396,20 @@ function renderTimeseriesChart(stationData) {
           borderWidth: 2,
           borderDash: [8, 4],
           tension: 0.08,
-          spanGaps: true,
+          spanGaps: false,
+        }] : []),
+        ...(hasFallbackDischarge ? [{
+          label: state.lang === 'pt'
+            ? 'Vazão estimada pela curva-chave mais recente (sem curva válida na data)'
+            : 'Estimated discharge, most recent rating curve (none valid on the date)',
+          data: fallbackDischarge,
+          yAxisID: 'yDischarge',
+          borderColor: 'rgba(38, 139, 136, 0.55)',
+          pointRadius: 0,
+          borderWidth: 2,
+          borderDash: [2, 4],
+          tension: 0.08,
+          spanGaps: false,
         }] : []),
       ],
     },
@@ -3429,9 +3446,9 @@ function renderTimeseriesChart(stationData) {
       },
     },
   });
-  // Say so when the station has rating curves but none is valid for the plotted days.
-  const noValidCurve = curves.length && !hasDerivedDischarge
-    ? ` · ${state.lang === 'pt' ? 'sem curva-chave válida neste período' : 'no rating curve valid for this period'}`
+  // Say so when some plotted days have no rating curve valid on the date.
+  const noValidCurve = hasFallbackDischarge
+    ? ` · ${state.lang === 'pt' ? 'parte da vazão usa a curva-chave mais recente' : 'part of the discharge uses the most recent rating curve'}`
     : '';
   byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}${noValidCurve}`;
 }
@@ -4396,6 +4413,7 @@ function dailySeriesCsvRows(stationData) {
     'interval_end',
     'estimated_discharge_m3s',
     'rating_curve_segment_id',
+    'rating_curve_valid_on_date',
   ]];
   stationData.dailyRows.forEach((row) => {
     const interval = findIntervalForDate(stationData, row.date);
@@ -4404,7 +4422,7 @@ function dailySeriesCsvRows(stationData) {
       interval ? interval.flood : stationData.summary.threshold_value,
       interval ? interval.severe : null,
     );
-    const estimate = curves.length ? validCurveDischarge(curves, row.date, row.observed_value) : { discharge: null, segment: null };
+    const estimate = curves.length ? validCurveDischarge(curves, row.date, row.observed_value) : { discharge: null, segment: null, validOnDate: null };
     const estimatedDischarge = estimate.discharge;
     rows.push([
       row.date,
@@ -4422,6 +4440,7 @@ function dailySeriesCsvRows(stationData) {
       interval?.endDate || '',
       estimatedDischarge,
       estimate.segment?.segmentId || '',
+      estimate.validOnDate == null ? '' : estimate.validOnDate,
     ]);
   });
   return rows;
@@ -5168,7 +5187,7 @@ async function exportStationReport() {
 
     // The discharge axis is drawn only when plotted stages fall inside the latest curve's range.
     const timeseriesCaption = state.charts.timeseriesChart?.scales?.yDischarge
-      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia.' : 'The right axis shows discharge estimated with the rating curve valid on each day.'}`
+      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia; sem curva válida na data, usa-se a mais recente (linha pontilhada).' : 'The right axis shows discharge estimated with the rating curve valid on each day; where none is valid on the date, the most recent curve is used (dotted line).'}`
       : report.chartCaption;
 
     const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;

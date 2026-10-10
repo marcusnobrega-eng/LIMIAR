@@ -27,28 +27,35 @@ export function ratingStageFromDischarge(dischargeM3s, coefficientA, coefficient
     return stageM * 100;
 }
 
-// The segment valid on the date whose stage range contains the stage, as in Supplementary
-// Section S4. The latest start date wins when curves overlap. Unlike the threshold pipeline,
-// there is no fallback to curves from other periods: without a valid curve the result is null.
+// Same rule as the threshold pipeline (Supplementary Section S4): among segments whose stage
+// range contains the stage, prefer those valid on the date; if none is valid on the date, use
+// the most recent one. The latest start date wins in both cases. `validOnDate` reports which.
 export function ratingSegmentForDate(curves, dateString, stageCm) {
     const stage = Number(stageCm);
     if (stageCm == null || !Number.isFinite(stage) || !dateString) return null;
-    let selected = null;
-    (curves || []).forEach((curve) => {
-      if (!Number.isFinite(curve.stageMin) || !Number.isFinite(curve.stageMax)) return;
-      if (stage < curve.stageMin || stage > curve.stageMax) return;
-      if (curve.validFrom && dateString < curve.validFrom) return;
-      if (curve.validTo && dateString > curve.validTo) return;
-      if (!selected || String(curve.validFrom || '') > String(selected.validFrom || '')) selected = curve;
-    });
-    return selected;
+    const latest = (candidates) => candidates.reduce(
+      (best, curve) => (!best || String(curve.validFrom || '') > String(best.validFrom || '') ? curve : best),
+      null,
+    );
+    const eligible = (curves || []).filter((curve) => (
+      Number.isFinite(curve.stageMin) && Number.isFinite(curve.stageMax)
+      && stage >= curve.stageMin && stage <= curve.stageMax
+    ));
+    if (!eligible.length) return null;
+    const onDate = eligible.filter((curve) => (
+      (!curve.validFrom || dateString >= curve.validFrom) && (!curve.validTo || dateString <= curve.validTo)
+    ));
+    if (onDate.length) return { segment: latest(onDate), validOnDate: true };
+    return { segment: latest(eligible), validOnDate: false };
 }
 
 export function validCurveDischarge(curves, dateString, stageCm) {
-    const segment = ratingSegmentForDate(curves, dateString, stageCm);
-    if (!segment) return { discharge: null, segment: null };
+    const match = ratingSegmentForDate(curves, dateString, stageCm);
+    const empty = { discharge: null, segment: null, validOnDate: null };
+    if (!match) return empty;
+    const { segment } = match;
     const discharge = ratingDischarge(stageCm, segment.coefficientA, segment.coefficientH0, segment.coefficientN);
-    return { discharge, segment: discharge == null ? null : segment };
+    return discharge == null ? empty : { discharge, segment, validOnDate: match.validOnDate };
 }
 
 export function normalizeThresholdTriplet(alert, flood, severe) {

@@ -21,21 +21,27 @@ async function dailyCsv(page) {
 test.describe('estimated discharge at stage stations', () => {
   test.skip(({ isMobile }) => isMobile, 'One browser is sufficient');
 
-  test('shows no discharge where no rating curve is valid (Canutama, 1976)', async ({ page }) => {
+  test('uses and flags the most recent curve where none is valid on the date (Canutama, 1976)', async ({ page }) => {
     await openStation(page, '1976-02-27');
-    await expect(page.locator('#timeseriesSubtitle')).toContainText('no rating curve valid for this period');
+    await expect(page.locator('#timeseriesSubtitle')).toContainText('part of the discharge uses the most recent rating curve');
     const { header, rows } = await dailyCsv(page);
+    const stage = header.indexOf('observed_value');
     const discharge = header.indexOf('estimated_discharge_m3s');
+    const validOnDate = header.indexOf('rating_curve_valid_on_date');
     expect(discharge).toBeGreaterThan(-1);
-    expect(header).toContain('rating_curve_segment_id');
+    expect(validOnDate).toBeGreaterThan(-1);
     expect(header).not.toContain('estimated_discharge_latest_curve_m3s');
     const row1976 = rows.find((row) => row[0] === '1976-02-27');
-    expect(row1976[discharge]).toBe('');
+    // 2,353 cm lies in the 2024-2025 upper segment (2,290-2,600 cm), the most recent one containing it.
+    expect(Number(row1976[stage])).toBe(2353);
+    expect(Number(row1976[discharge])).toBeCloseTo(42.8607 * (23.53 - 9.18) ** 2.057, 3);
+    expect(row1976[validOnDate]).toBe('false');
+    expect(rows.filter((row) => row[0] < '1997-01-01' && row[discharge] !== '').every((row) => row[validOnDate] === 'false')).toBe(true);
   });
 
   test('uses the segment valid on each date, including the lower stage range', async ({ page }) => {
     await openStation(page, '2018-03-01');
-    await expect(page.locator('#timeseriesSubtitle')).not.toContainText('no rating curve valid');
+    await expect(page.locator('#timeseriesSubtitle')).not.toContainText('most recent rating curve');
     const { header, rows } = await dailyCsv(page);
     const stage = header.indexOf('observed_value');
     const discharge = header.indexOf('estimated_discharge_m3s');
@@ -47,7 +53,7 @@ test.describe('estimated discharge at stage stations', () => {
       const expected = Number(row[stage]) <= 2289 ? 9.9319 * (stageM - 0.21) ** 2.2 : 93.1542 * (stageM - 8.14) ** 1.72;
       expect(Number(row[discharge])).toBeCloseTo(expected, 3);
       expect(row[segment]).toContain('20160109');
+      expect(row[header.indexOf('rating_curve_valid_on_date')]).toBe('true');
     }
-    expect(rows.some((row) => row[0] < '1997-01-01' && row[discharge] !== '')).toBe(false);
   });
 });
