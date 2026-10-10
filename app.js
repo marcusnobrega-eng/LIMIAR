@@ -203,7 +203,7 @@ const TEXT = {
       all: 'Todos',
       normal: 'Normal',
       warning: 'Alerta',
-      flooded: 'Inundada',
+      flooded: 'Inundação',
       extreme_flooding: 'Inundação extrema',
       no_data: 'Sem dados',
     },
@@ -228,8 +228,8 @@ const TEXT = {
     legend: {
       normal: 'Normal',
       warning: 'Alerta',
-      flooded: 'Inundada',
-      extreme_flooding: 'Extrema',
+      flooded: 'Inundação',
+      extreme_flooding: 'Inundação extrema',
       no_data: 'Sem dados',
     },
     fields: {
@@ -298,7 +298,7 @@ const TEXT = {
         classesText: 'Cada dia é comparado com os limiares ativos naquela data. Normal fica abaixo de todos os limiares disponíveis, e Sem dados indica ausência de observação válida.',
         classes: [
           'Alerta: igual ou acima de Q_{T} para T = 1,25 ano e abaixo do limiar de inundação.',
-          'Inundada: igual ou acima do limiar de margens plenas ou, sem ele, de Q_{RP2}.',
+          'Inundação: igual ou acima do limiar de margens plenas ou, sem ele, de Q_{RP2}.',
           'Inundação extrema: igual ou acima de Q_{T} para T = 3,5 anos.',
         ],
         classesAfter: 'Em estações analisadas em cota, essas vazões são convertidas em cota pela curva-chave inversa:',
@@ -420,7 +420,7 @@ const TEXT = {
     actionsMenuLabel: 'Actions',
     eyebrowLabel: 'Historical flood reconstruction',
     heroTitle: 'Flood conditions by station and date',
-    heroText: 'Choose a date to find stations under normal, warning, flooded, or extreme flooding conditions.',
+    heroText: 'Choose a date to find stations under normal, warning, flood, or extreme flood conditions.',
     statStationsLabel: 'Published stations',
     statRangeLabel: 'Date range',
     statLatestLabel: 'Latest date',
@@ -454,7 +454,7 @@ const TEXT = {
     dailyConditionsTitle: 'Distribution of conditions',
     dailyConditionsSubtitle: 'Number and share of stations in each class.',
     dailySpatialTitle: 'Spatial distribution of conditions outside normal',
-    dailySpatialSubtitle: 'Warning, flooded, and extreme conditions grouped into five-degree bands.',
+    dailySpatialSubtitle: 'Warning, flood, and extreme flood conditions grouped into five-degree bands.',
     dailyLatitudeTitle: 'By latitude',
     dailyLongitudeTitle: 'By longitude',
     dailyStateRankingTitle: 'States with the highest share outside normal',
@@ -543,8 +543,8 @@ const TEXT = {
       all: 'All',
       normal: 'Normal',
       warning: 'Warning',
-      flooded: 'Flooded',
-      extreme_flooding: 'Extreme flooding',
+      flooded: 'Flood',
+      extreme_flooding: 'Extreme flood',
       no_data: 'No data',
     },
     basis: {
@@ -568,8 +568,8 @@ const TEXT = {
     legend: {
       normal: 'Normal',
       warning: 'Warning',
-      flooded: 'Flooded',
-      extreme_flooding: 'Extreme',
+      flooded: 'Flood',
+      extreme_flooding: 'Extreme flood',
       no_data: 'No data',
     },
     fields: {
@@ -638,8 +638,8 @@ const TEXT = {
         classesText: 'Each day is compared with the thresholds active on that date. Normal is below every available threshold, and No data means no valid observation.',
         classes: [
           'Warning: at or above Q_{T} at T = 1.25 years and below the flood threshold.',
-          'Flooded: at or above the bankfull threshold or, where there is none, Q_{RP2}.',
-          'Extreme flooding: at or above Q_{T} at T = 3.5 years.',
+          'Flood: at or above the bankfull threshold or, where there is none, Q_{RP2}.',
+          'Extreme flood: at or above Q_{T} at T = 3.5 years.',
         ],
         classesAfter: 'At stations analysed in stage, these discharges are converted to stage with the inverse rating curve:',
         classesNote: 'An alert threshold at or above the flood threshold, or a severe threshold at or below it, is not used.',
@@ -2347,6 +2347,9 @@ function applyStaticTranslations() {
     dateScrubber.setAttribute('aria-label', text('dateScrubberLabel'));
     dateScrubber.setAttribute('title', text('dateScrubberLabel'));
   }
+  // The legend is built in code, so it must be redrawn whenever the language changes,
+  // including the language read from the URL on first load.
+  if (byId('legendItems')) renderLegend();
   const languageSwitch = document.querySelector('.language-switch');
   if (languageSwitch) languageSwitch.setAttribute('aria-label', text('languageSwitchLabel'));
   const actionsSummary = document.querySelector('.actions-menu summary');
@@ -5467,6 +5470,8 @@ async function boot() {
     state.lang = urlState.lang;
     applyStaticTranslations();
     updateLanguageButtons();
+    // Totals were drawn before the URL language was known; redraw them in that language.
+    renderGlobalStats();
   }
   populateFilters();
   byId('qaFilter').value = 'screening_ok';
