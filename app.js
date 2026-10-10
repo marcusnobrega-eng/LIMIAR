@@ -76,6 +76,8 @@ const TEXT = {
     previousDateLabel: 'Dia anterior',
     nextDateLabel: 'Próximo dia',
     dateScrubberLabel: 'Controle de rolagem da data',
+    maximizeChart: 'Ampliar gráfico',
+    chartUnavailable: 'Este gráfico ainda não está disponível.',
     crossSectionTableTitle: 'Levantamentos das seções',
     crossSectionTableNote: 'Calculado sobre o perfil completo: o talvegue é o ponto mais baixo e a cota de margens plenas é a menor das duas margens.',
     thSurveyDate: 'Data do levantamento',
@@ -442,6 +444,8 @@ const TEXT = {
     previousDateLabel: 'Previous day',
     nextDateLabel: 'Next day',
     dateScrubberLabel: 'Date scroll control',
+    maximizeChart: 'Maximize chart',
+    chartUnavailable: 'This chart is not available yet.',
     crossSectionTableTitle: 'Cross-section surveys',
     crossSectionTableNote: 'Computed on the full profile: the thalweg is the lowest point and bankfull stage is the lower of the two banks.',
     thSurveyDate: 'Survey date',
@@ -2407,6 +2411,7 @@ function applyStaticTranslations() {
   // The legend is built in code, so it must be redrawn whenever the language changes,
   // including the language read from the URL on first load.
   if (byId('legendItems')) renderLegend();
+  translateChartMaximizeButtons();
   const languageSwitch = document.querySelector('.language-switch');
   if (languageSwitch) languageSwitch.setAttribute('aria-label', text('languageSwitchLabel'));
   const actionsSummary = document.querySelector('.actions-menu summary');
@@ -5564,6 +5569,84 @@ async function exportStationReport() {
   }
 }
 
+const MAXIMIZABLE_CHARTS = [
+  'timeseriesChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
+  'seasonalityChart', 'dailyConditionsChart', 'dailyLatitudeChart', 'dailyLongitudeChart',
+];
+const MAXIMIZE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+
+// Copies Chart.js options without losing callbacks, enlarging every font for the dialog.
+function enlargeChartFonts(value, factor) {
+  if (Array.isArray(value)) return value.map((item) => enlargeChartFonts(item, factor));
+  if (!value || typeof value !== 'object') return value;
+  const copy = {};
+  Object.entries(value).forEach(([key, item]) => {
+    copy[key] = key === 'font' && item && typeof item === 'object' && !Array.isArray(item)
+      ? { ...item, size: Math.round((Number(item.size) || 12) * factor) }
+      : enlargeChartFonts(item, factor);
+  });
+  return copy;
+}
+
+function addChartMaximizeButtons() {
+  MAXIMIZABLE_CHARTS.forEach((chartKey) => {
+    const card = byId(chartKey)?.closest('.chart-card');
+    const head = card?.querySelector('.section-head');
+    if (!head || head.querySelector('.chart-maximize')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chart-maximize';
+    button.dataset.chart = chartKey;
+    button.innerHTML = MAXIMIZE_ICON;
+    button.setAttribute('aria-label', text('maximizeChart'));
+    button.title = text('maximizeChart');
+    button.addEventListener('click', () => openChartOverlay(chartKey, button));
+    (head.querySelector('.section-actions') || head).appendChild(button);
+  });
+}
+
+function translateChartMaximizeButtons() {
+  document.querySelectorAll('.chart-maximize').forEach((button) => {
+    button.setAttribute('aria-label', text('maximizeChart'));
+    button.title = text('maximizeChart');
+  });
+}
+
+function openChartOverlay(chartKey, trigger) {
+  const source = state.charts[chartKey];
+  if (!source) {
+    showToast(text('chartUnavailable'));
+    return;
+  }
+  const card = byId(chartKey).closest('.chart-card');
+  byId('chartOverlayTitle').textContent = card?.querySelector('.section-head h3')?.textContent || '';
+  byId('chartOverlaySubtitle').textContent = card?.querySelector('.section-head span')?.textContent || '';
+  state.chartOverlayTrigger = trigger;
+  openOverlay('chartOverlay');
+  const config = source.config._config;
+  state.chartOverlay?.destroy();
+  // A separate chart with copied data, so the chart on the page is left untouched.
+  state.chartOverlay = new Chart(byId('chartOverlayCanvas'), {
+    type: config.type,
+    data: {
+      labels: [...(source.data.labels || [])],
+      datasets: source.data.datasets.map((dataset) => ({ ...dataset, data: Array.isArray(dataset.data) ? [...dataset.data] : dataset.data })),
+    },
+    options: { ...enlargeChartFonts(config.options || {}, 1.3), responsive: true, maintainAspectRatio: false, animation: false },
+    plugins: config.plugins || [],
+  });
+  byId('closeChartButton').focus();
+}
+
+function closeChartOverlay() {
+  if (byId('chartOverlay')?.hidden) return;
+  closeOverlay('chartOverlay');
+  state.chartOverlay?.destroy();
+  state.chartOverlay = null;
+  state.chartOverlayTrigger?.focus();
+  state.chartOverlayTrigger = null;
+}
+
 function wireEvents() {
   ['stationSearch', 'statusFilter', 'basisFilter', 'qaFilter', 'crossSectionFilter', 'ratingCurveFilter', 'ufFilter', 'basinFilter', 'biomeFilter'].forEach((id) => {
     byId(id).addEventListener('input', applyFilters);
@@ -5640,10 +5723,14 @@ function wireEvents() {
   byId('guideSkipButton').addEventListener('click', () => closeGuide(true));
   byId('closeLayersButton').addEventListener('click', () => closeOverlay('layersOverlay'));
   byId('closeImageButton').addEventListener('click', () => closeOverlay('imageOverlay'));
+  byId('closeChartButton').addEventListener('click', closeChartOverlay);
+  addChartMaximizeButtons();
   document.querySelectorAll('[data-overlay-close]').forEach((button) => {
     button.addEventListener('click', () => {
       if (button.dataset.overlayClose === 'theoryOverlay') {
         closeGuide(true);
+      } else if (button.dataset.overlayClose === 'chartOverlay') {
+        closeChartOverlay();
       } else {
         closeOverlay(button.dataset.overlayClose);
       }
@@ -5651,9 +5738,16 @@ function wireEvents() {
   });
   window.addEventListener('keydown', (event) => {
     if (handleGuideKeydown(event)) return;
+    // The chart dialog's only focusable control is its close button, so Tab stays there.
+    if (event.key === 'Tab' && !byId('chartOverlay').hidden) {
+      event.preventDefault();
+      byId('closeChartButton').focus();
+      return;
+    }
     if (event.key !== 'Escape') return;
     closeOverlay('layersOverlay');
     closeOverlay('imageOverlay');
+    closeChartOverlay();
   });
   document.querySelectorAll('.lang-button').forEach((button) => {
     button.addEventListener('click', async () => {
