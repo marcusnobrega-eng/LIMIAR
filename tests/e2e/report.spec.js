@@ -5,14 +5,14 @@ import { readZip } from './zip.js';
 const POINT_EMU = 12700;
 const TEXT_WIDTH_EMU = ((11906 - 2 * 1440) / 20) * POINT_EMU;
 
-async function downloadReport(page, lang) {
-  await page.goto(`/?date=2020-01-01&lang=${lang}&station=83250000&guide=0`);
+async function downloadReport(page, lang, date = '2020-01-01') {
+  await page.goto(`/?date=${date}&lang=${lang}&station=83250000&guide=0`);
   await expect(page.locator('#stationHeading')).toContainText('ITUPORANGA', { timeout: 30_000 });
   await expect(page.locator('#timeseriesChart')).toBeVisible();
   const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
   await page.locator('#exportReportButton').click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe('limiar_station_83250000_2020-01-01.docx');
+  expect(download.suggestedFilename()).toBe(`limiar_station_83250000_${date}.docx`);
   return readZip(readFileSync(await download.path()));
 }
 
@@ -68,6 +68,14 @@ test.describe('station report export', () => {
     expect(documentXml).toContain('is not a warning service');
     const methodsStart = documentXml.lastIndexOf('Methods and uncertainty');
     expect(methodsStart).toBeGreaterThan(documentXml.indexOf('All reconstructed station events'));
+  });
+
+  test('mentions the discharge axis only when the chart draws it', async ({ page }) => {
+    // On 2020-01-01 the plotted stages lie below the latest rating curve; in September 2011 they lie within it.
+    const withoutAxis = (await downloadReport(page, 'en', '2020-01-01')).get('word/document.xml').toString('utf8');
+    expect(withoutAxis).not.toContain('The right axis shows discharge');
+    const withAxis = (await downloadReport(page, 'en', '2011-09-09')).get('word/document.xml').toString('utf8');
+    expect(withAxis).toContain('The right axis shows discharge');
   });
 
   test('prints chart text at 16 pt or larger', async ({ page }) => {
