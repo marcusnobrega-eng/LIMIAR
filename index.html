@@ -272,6 +272,19 @@
               <div class="chart-empty" id="crossSectionEmpty" hidden>Sem seções transversais representativas para esta estação.</div>
               <canvas id="crossSectionChart" height="260"></canvas>
             </div>
+            <div class="section-head table-head">
+              <div>
+                <h4 id="crossSectionTableTitle">Levantamentos das seções</h4>
+                <span id="crossSectionTableNote">Calculado sobre o perfil completo: o talvegue é o ponto mais baixo e a cota de margens plenas é a menor das duas margens.</span>
+              </div>
+              <button class="toolbar-button section-button" id="exportCrossSectionTableCsvButton" type="button">Baixar tabela</button>
+            </div>
+            <div class="table-wrap table-scroll">
+              <table class="hydraulic-table">
+                <thead><tr><th id="thSurveyDate">Data do levantamento</th><th id="thThalweg">Talvegue (cm)</th><th id="thLeftBank">Margem esquerda (cm)</th><th id="thRightBank">Margem direita (cm)</th><th id="thBankfull">Margens plenas (cm)</th><th id="thDepth">Profundidade até margens plenas (cm)</th></tr></thead>
+                <tbody id="crossSectionTableBody"></tbody>
+              </table>
+            </div>
           </section>
 
           <section class="chart-card">
@@ -299,6 +312,19 @@
             <div class="chart-wrap">
               <div class="chart-empty" id="ratingCurveEmpty" hidden>Sem curvas-chave suficientes para reconstruir este painel.</div>
               <canvas id="ratingCurveChart" height="260"></canvas>
+            </div>
+            <div class="section-head table-head">
+              <div>
+                <h4 id="ratingTableTitle">Curvas-chave</h4>
+                <span id="ratingTableNote">Um trecho por linha. H é a cota em metros e Q a vazão em m³/s.</span>
+              </div>
+              <button class="toolbar-button section-button" id="exportRatingTableCsvButton" type="button">Baixar tabela</button>
+            </div>
+            <div class="table-wrap table-scroll">
+              <table class="hydraulic-table">
+                <thead><tr><th id="thValidFrom">Válida de</th><th id="thValidTo">Válida até</th><th id="thSegment">Trecho</th><th id="thConsistency">Consistência</th><th id="thStageRange">Faixa de cota (cm)</th><th id="thEquation">Equação</th></tr></thead>
+                <tbody id="ratingTableBody"></tbody>
+              </table>
             </div>
           </section>
 
@@ -581,6 +607,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-  <script type="module" src="app.js?v=26"></script>
+  <script type="module" src="app.js?v=27"></script>
   </body>
 </html>
