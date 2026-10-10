@@ -12,6 +12,7 @@ async function dailyCsv(page) {
   const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
   await page.locator('#exportTimeseriesCsvButton').click();
   const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^limiar_station_13880000_CANUTAMA_\d{4}-\d{2}-\d{2}_timeseries\.csv$/);
   // Every value is quoted, so split on the quote-comma-quote boundary.
   const parse = (line) => line.slice(1, -1).split('","').map((value) => value.replaceAll('""', '"'));
   const [header, ...rows] = readFileSync(await download.path(), 'utf8').trim().split(/\r?\n/).map(parse);

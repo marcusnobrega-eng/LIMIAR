@@ -217,3 +217,14 @@ describe('rating-curve segments', () => {
   });
 });
 
+describe('file names', () => {
+  it('turns station names into plain file-name parts', () => {
+    expect(core.fileNamePart('ITUPORANGA')).toBe('ITUPORANGA');
+    expect(core.fileNamePart('São José dos Campos (montante)')).toBe('Sao_Jose_dos_Campos_montante');
+    expect(core.fileNamePart('  ÁGUA / ÇÃO  ')).toBe('AGUA_CAO');
+    expect(core.fileNamePart('A'.repeat(70))).toHaveLength(60);
+    expect(core.fileNamePart(`${'B'.repeat(59)} C`)).toBe('B'.repeat(59));
+    expect(core.fileNamePart(null)).toBe('');
+  });
+});
+
