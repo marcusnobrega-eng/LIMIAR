@@ -6,7 +6,7 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'node_modules/**', '.stryker-tmp/**'],
     coverage: {
       provider: 'v8',
-      include: ['core.js'],
+      include: ['core.js', 'office-charts.js'],
       reporter: ['text', 'json', 'lcov'],
       thresholds: {
         lines: 90,
