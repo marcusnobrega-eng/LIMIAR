@@ -11,7 +11,7 @@ async function downloadReport(page, lang, date = '2020-01-01') {
   const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
   await page.locator('#exportReportButton').click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe(`limiar_station_83250000_${date}.docx`);
+  expect(download.suggestedFilename()).toBe(`limiar_station_83250000_ITUPORANGA_${date}.docx`);
   return readZip(readFileSync(await download.path()));
 }
 

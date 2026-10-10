@@ -1,5 +1,6 @@
 import {
   addDays,
+  fileNamePart,
   bankfullFromProfile,
   normalizeThresholdTriplet,
   parseRatingSegmentId,
@@ -4374,6 +4375,12 @@ function buildCsv(rows) {
     .join('\n');
 }
 
+// Station files are named by code and name, for example limiar_station_83250000_ITUPORANGA.
+function stationFileStem(stationData) {
+  const name = fileNamePart(stationData.metadata.station_name);
+  return `limiar_station_${stationData.metadata.station_code}${name ? `_${name}` : ''}`;
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -4787,8 +4794,8 @@ function seasonalityCsvRows(stationData) {
 }
 
 function buildStationCsvEntries(stationData) {
-  const stationCode = stationData.metadata.station_code;
   const selectedDateSlug = state.selectedDate || 'date';
+  const stem = stationFileStem(stationData);
   const readme = state.lang === 'pt'
     ? [
       'Pacote CSV da estação LIMIAR',
@@ -4823,25 +4830,25 @@ function buildStationCsvEntries(stationData) {
       '- seasonality.csv: monthly counts of event starts and peaks.',
     ].join('\n');
   return [
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/README.txt`, text: readme },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/metadata_summary.csv`, text: buildCsv(stationMetadataCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/daily_timeseries.csv`, text: buildCsv(dailySeriesCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/threshold_intervals.csv`, text: buildCsv(thresholdIntervalsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/cross_sections.csv`, text: buildCsv(crossSectionsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/cross_section_surveys.csv`, text: buildCsv(crossSectionTableCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_segments.csv`, text: buildCsv(ratingTableCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_lines.csv`, text: buildCsv(ratingCurveLinesCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_threshold_points.csv`, text: buildCsv(ratingCurveThresholdPointsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/annual_maxima_thresholds.csv`, text: buildCsv(annualEvidenceCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/events_reconstructed.csv`, text: buildCsv(eventsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/seasonality.csv`, text: buildCsv(seasonalityCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/README.txt`, text: readme },
+    { name: `${stem}_${selectedDateSlug}/metadata_summary.csv`, text: buildCsv(stationMetadataCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/daily_timeseries.csv`, text: buildCsv(dailySeriesCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/threshold_intervals.csv`, text: buildCsv(thresholdIntervalsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/cross_sections.csv`, text: buildCsv(crossSectionsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/cross_section_surveys.csv`, text: buildCsv(crossSectionTableCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_segments.csv`, text: buildCsv(ratingTableCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_lines.csv`, text: buildCsv(ratingCurveLinesCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_threshold_points.csv`, text: buildCsv(ratingCurveThresholdPointsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/annual_maxima_thresholds.csv`, text: buildCsv(annualEvidenceCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/events_reconstructed.csv`, text: buildCsv(eventsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/seasonality.csv`, text: buildCsv(seasonalityCsvRows(stationData)) },
   ];
 }
 
 function exportStationDataPackage() {
   if (!state.selectedData) return;
   const entries = buildStationCsvEntries(state.selectedData);
-  downloadBlob(buildZipBlob(entries), `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}.zip`);
+  downloadBlob(buildZipBlob(entries), `${stationFileStem(state.selectedData)}_${state.selectedDate}.zip`);
   showToast(TEXT[state.lang].toasts.stationDataReady);
 }
 
@@ -4915,7 +4922,7 @@ function exportStationCsv(kind) {
   if (!state.selectedData) return;
   const config = STATION_CSV_EXPORTS[kind];
   if (!config) return;
-  const filename = `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}_${config.slug}.csv`;
+  const filename = `${stationFileStem(state.selectedData)}_${state.selectedDate}_${config.slug}.csv`;
   downloadBlob(
     new Blob([buildCsv(config.rows(state.selectedData))], { type: 'text/csv;charset=utf-8' }),
     filename,
@@ -5553,7 +5560,7 @@ async function exportStationReport() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}.docx`;
+    link.download = `${stationFileStem(state.selectedData)}_${state.selectedDate}.docx`;
     link.click();
     URL.revokeObjectURL(url);
     showToast(TEXT[state.lang].toasts.reportReady);

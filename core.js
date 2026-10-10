@@ -218,3 +218,14 @@ export function ratingEquationParts(coefficientA, coefficientH0, coefficientN, f
   };
 }
 
+// Plain ASCII for file names: accents removed, other characters joined by underscores.
+export function fileNamePart(value, maxLength = 60) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, maxLength)
+    .replace(/_+$/, '');
+}
+
