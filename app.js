@@ -1557,8 +1557,10 @@ function ensureMap() {
   setRegionLoading('map', true);
   map = L.map('map', {
     preferCanvas: true,
-    zoomControl: true,
+    zoomControl: false,
   }).setView([-14.5, -52.5], 4);
+  // Top right keeps the zoom buttons clear of the selected-day card.
+  L.control.zoom({ position: 'topright' }).addTo(map);
 
   Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
     state.baseLayers[key] = L.tileLayer(config.url, {
