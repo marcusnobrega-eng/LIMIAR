@@ -284,6 +284,37 @@ const TEXT = {
       statusSection: 'Situação na data selecionada',
       chartsGroup: 'Gráficos da estação',
       page: { label: 'Página', of: 'de' },
+      methods: {
+        title: 'Métodos e incerteza',
+        intro: 'Esta seção resume como os valores deste relatório foram calculados. Os procedimentos completos estão no manuscrito do LIMIAR e nas Seções S3 a S7 do Material Suplementar.',
+        thresholdHeading: 'Limiar de margens plenas',
+        thresholdText: 'Em cada seção transversal levantada, o talvegue é o ponto mais profundo. A cota de margens plenas, H_{bf}, é a menor entre as cotas mais altas levantadas de cada lado do talvegue. Quando a estação registra cota diária, ela é comparada diretamente com H_{bf}. Caso contrário, a curva-chave válida na data converte H_{bf} em vazão de margens plenas, Q_{bf}:',
+        thresholdAfter: 'a, h_{0} e n são os coeficientes do trecho da curva-chave que contém H_{bf} (cota em m, vazão em m³/s). Um novo período de limiar começa quando a seção ou a curva-chave ativa muda, de modo que o limiar pode variar ao longo do registro.',
+        statHeading: 'Referência estatística',
+        statText: 'Sem limiar de seção levantada, o limiar é a vazão de dois anos de tempo de retorno, Q_{RP2}. Os máximos anuais de vazão M são tomados por ano hidrológico (1º de outubro a 30 de setembro), com ao menos 90% de dias válidos por ano e ao menos 10 anos válidos. Uma distribuição de Gumbel é ajustada pelo método dos momentos, com média M̄ e desvio-padrão s_{M} dos máximos anuais:',
+        statAfter: 'Q_{RP2} é Q_{T} para T = 2 anos. É uma referência estatística de vazão alta e não se supõe igual à vazão de margens plenas.',
+        classesHeading: 'Condições diárias',
+        classesText: 'Cada dia é comparado com os limiares ativos naquela data. Normal fica abaixo de todos os limiares disponíveis, e Sem dados indica ausência de observação válida.',
+        classes: [
+          'Alerta: igual ou acima de Q_{T} para T = 1,25 ano e abaixo do limiar de inundação.',
+          'Inundada: igual ou acima do limiar de margens plenas ou, sem ele, de Q_{RP2}.',
+          'Inundação extrema: igual ou acima de Q_{T} para T = 3,5 anos.',
+        ],
+        classesAfter: 'Em estações analisadas em cota, essas vazões são convertidas em cota pela curva-chave inversa:',
+        classesNote: 'Um limiar de alerta igual ou acima do limiar de inundação, ou um limiar severo igual ou abaixo dele, não é usado.',
+        eventsHeading: 'Eventos reconstruídos',
+        eventsText: 'Um evento é uma sequência contínua de dias válidos igual ou acima do limiar ativo. Um dia abaixo do limiar, ou uma falha no registro, encerra o evento.',
+        uncertaintyHeading: 'Incerteza e limitações',
+        uncertainty: [
+          'A cota de margens plenas vem de uma regra geométrica aplicada em todo o país. A interpretação de campo pode variar entre rios.',
+          'A comparação em cota supõe que a série diária e a seção usam a mesma referência vertical, o que as tabelas públicas não permitem verificar em todas as estações.',
+          'A conversão carrega o erro da curva-chave e só é usada dentro da faixa de cotas de cada trecho.',
+          'Q_{RP2} tem incerteza amostral, que diminui com registros mais longos. O modelo de Gumbel não representa mudanças da frequência de cheias no tempo.',
+          'A faixa sombreada da seção transversal vai do percentil 10 ao 90 da cota de margens plenas entre os períodos de limiar. Ela mostra a variação entre levantamentos, não um intervalo de confiança.',
+          'O rótulo de incerteza depende do tipo de limiar: média para seção levantada e alta para Q_{RP2}. O uso recomendado vem das verificações automáticas de dados.',
+          'Superar um limiar é uma condição no posto. Isso não mostra que a planície foi inundada nem a extensão da água. O LIMIAR apresenta reconstruções históricas e não é um serviço de alerta.',
+        ],
+      },
       chartSection: 'Série temporal principal',
       chartCaption: 'Registro diário observado com a data selecionada e os limiares aplicados.',
       crossSectionSection: 'Evolução das seções transversais',
@@ -593,6 +624,37 @@ const TEXT = {
       statusSection: 'Selected-day conditions',
       chartsGroup: 'Station charts',
       page: { label: 'Page', of: 'of' },
+      methods: {
+        title: 'Methods and uncertainty',
+        intro: 'This section summarizes how the values in this report were computed. The full procedures are in the LIMIAR manuscript and in Supplementary Sections S3 to S7.',
+        thresholdHeading: 'Bankfull threshold',
+        thresholdText: 'For each surveyed cross section, the thalweg is the deepest surveyed point. Bankfull stage, H_{bf}, is the lower of the highest surveyed elevations on each side of the thalweg. Where the station records daily stage, it is compared directly with H_{bf}. Otherwise, the rating curve valid on that date converts H_{bf} to bankfull discharge, Q_{bf}:',
+        thresholdAfter: 'a, h_{0}, and n are the coefficients of the rating-curve segment that contains H_{bf} (stage in m, discharge in m³/s). A new threshold period begins when the active cross section or rating curve changes, so the threshold can change through the record.',
+        statHeading: 'Statistical reference',
+        statText: 'Without a threshold from a surveyed cross section, the threshold is the two-year return discharge, Q_{RP2}. Annual maximum discharges M are taken by hydrological year (1 October to 30 September), with at least 90% valid days per year and at least 10 valid years. A Gumbel distribution is fitted by the method of moments, with mean M̄ and standard deviation s_{M} of the annual maxima:',
+        statAfter: 'Q_{RP2} is Q_{T} at T = 2 years. It is a statistical high-flow reference and is not assumed to equal bankfull discharge.',
+        classesHeading: 'Daily conditions',
+        classesText: 'Each day is compared with the thresholds active on that date. Normal is below every available threshold, and No data means no valid observation.',
+        classes: [
+          'Warning: at or above Q_{T} at T = 1.25 years and below the flood threshold.',
+          'Flooded: at or above the bankfull threshold or, where there is none, Q_{RP2}.',
+          'Extreme flooding: at or above Q_{T} at T = 3.5 years.',
+        ],
+        classesAfter: 'At stations analysed in stage, these discharges are converted to stage with the inverse rating curve:',
+        classesNote: 'An alert threshold at or above the flood threshold, or a severe threshold at or below it, is not used.',
+        eventsHeading: 'Reconstructed events',
+        eventsText: 'An event is a continuous run of valid days at or above the active threshold. One day below the threshold, or a gap in the record, ends the event.',
+        uncertaintyHeading: 'Uncertainty and limits',
+        uncertainty: [
+          'Bankfull stage comes from one geometric rule applied nationally. Field interpretations can differ among rivers.',
+          'Stage comparison assumes that the daily series and the cross section share a vertical reference, which the public tables do not allow us to check at every station.',
+          'Conversion carries the error of the rating curve and is used only within the stage range of each curve segment.',
+          'Q_{RP2} has sampling uncertainty that decreases with longer records. The Gumbel model does not represent changes in flood frequency through time.',
+          'The shaded band in the cross-section chart spans the 10th to 90th percentiles of bankfull stage across threshold periods. It shows variation among surveys, not a confidence interval.',
+          'The uncertainty label depends on threshold type: medium for a surveyed cross section and high for Q_{RP2}. Recommended use comes from the automated data checks.',
+          'Exceeding a threshold is a condition at the gauge. It does not show that the floodplain was inundated or how far water spread. LIMIAR presents historical reconstructions and is not a warning service.',
+        ],
+      },
       chartSection: 'Primary time series',
       chartCaption: 'Observed daily record with the selected day and the thresholds applied to that period.',
       crossSectionSection: 'Cross-section evolution',
@@ -4797,6 +4859,7 @@ function reportRun(text, options = {}) {
     text: text == null ? '' : String(text),
     bold: Boolean(options.bold),
     italics: Boolean(options.italics),
+    subScript: Boolean(options.subScript),
     color: options.color || REPORT_THEME.text,
     size: options.size || REPORT_SIZE.body,
     font: options.bold ? REPORT_FONT.bold : REPORT_FONT.body,
@@ -4808,6 +4871,7 @@ function reportParagraph(text, options = {}) {
   return new docx.Paragraph({
     alignment: options.alignment,
     heading: options.heading,
+    bullet: options.bullet,
     keepNext: options.keepNext,
     tabStops: options.tabStops,
     border: options.border,
@@ -4912,6 +4976,81 @@ function reportSection(sectionTitle, footerText, children) {
     },
     children,
   };
+}
+
+// Text such as 'H_{bf}' becomes H with a subscript bf.
+function reportRichRuns(value, options = {}) {
+  return String(value).split(/(_\{[^}]*\})/).filter(Boolean).map((part) => {
+    const subscript = part.match(/^_\{([^}]*)\}$/);
+    return subscript ? reportRun(subscript[1], { ...options, subScript: true }) : reportRun(part, options);
+  });
+}
+
+function reportEquation(children) {
+  const docx = window.docx;
+  return new docx.Paragraph({
+    alignment: docx.AlignmentType.CENTER,
+    keepNext: true,
+    spacing: { before: 40, after: 100 },
+    children: [new docx.Math({ children })],
+  });
+}
+
+function reportMethodEquations() {
+  const docx = window.docx;
+  const run = (value) => new docx.MathRun(value);
+  const sub = (base, index) => new docx.MathSubScript({ children: [run(base)], subScript: [run(index)] });
+  const fraction = (numerator, denominator) => new docx.MathFraction({ numerator, denominator });
+  const eulerGamma = state.lang === 'pt' ? '0,5772' : '0.5772';
+  return {
+    bankfull: [
+      sub('Q', 'bf'),
+      run('=a'),
+      new docx.MathSuperScript({ children: [run('('), sub('H', 'bf'), run('−'), sub('h', '0'), run(')')], superScript: [run('n')] }),
+    ],
+    gumbelFit: [
+      run('β='),
+      fraction([sub('s', 'M'), new docx.MathRadical({ children: [run('6')] })], [run('π')]),
+      run(`,  μ=M̄−${eulerGamma}β`),
+    ],
+    gumbelQuantile: [sub('Q', 'T'), run('=μ−β ln[−ln(1−'), fraction([run('1')], [run('T')]), run(')]')],
+    inverseRating: [
+      run('H='),
+      sub('h', '0'),
+      run('+'),
+      new docx.MathSuperScript({ children: [run('('), fraction([run('Q')], [run('a')]), run(')')], superScript: [fraction([run('1')], [run('n')])] }),
+    ],
+  };
+}
+
+function reportMethodsChildren(heading, subheading) {
+  const methods = TEXT[state.lang].report.methods;
+  const equations = reportMethodEquations();
+  const prose = (value) => reportParagraph('', { children: reportRichRuns(value), after: 100 });
+  const bullet = (value) => reportParagraph('', { children: reportRichRuns(value), bullet: { level: 0 }, after: 60 });
+  return [
+    heading(methods.title),
+    prose(methods.intro),
+    subheading(methods.thresholdHeading),
+    prose(methods.thresholdText),
+    reportEquation(equations.bankfull),
+    prose(methods.thresholdAfter),
+    subheading(methods.statHeading),
+    prose(methods.statText),
+    reportEquation(equations.gumbelFit),
+    reportEquation(equations.gumbelQuantile),
+    prose(methods.statAfter),
+    subheading(methods.classesHeading),
+    prose(methods.classesText),
+    ...methods.classes.map(bullet),
+    prose(methods.classesAfter),
+    reportEquation(equations.inverseRating),
+    prose(methods.classesNote),
+    subheading(methods.eventsHeading),
+    prose(methods.eventsText),
+    subheading(methods.uncertaintyHeading),
+    ...methods.uncertainty.map(bullet),
+  ];
 }
 
 async function exportStationReport() {
@@ -5131,6 +5270,7 @@ async function exportStationReport() {
           heading(report.eventsSection),
           reportTable(eventsTableRows, eventColumns),
         ]),
+        reportSection(report.methods.title, footerText, reportMethodsChildren(heading, subheading)),
       ],
     });
     const blob = await docx.Packer.toBlob(doc);
