@@ -3,6 +3,8 @@ import {
   fileNamePart,
   bankfullFromProfile,
   continuousDates,
+  niceAxisRange,
+  validCurveStage,
   normalizeThresholdTriplet,
   parseRatingSegmentId,
   quantileFromSorted,
@@ -18,7 +20,7 @@ import {
   provisionalRuns,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=7';
+} from './core.js?v=9';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
@@ -111,12 +113,13 @@ const TEXT = {
       observedStage: 'Cota observada (telemetria ANA)',
       glofas: 'Previsão GloFAS (vazão de modelo)',
       level: (years) => `GloFAS ${years} anos`,
-      limiarThreshold: 'Limiar de inundação LIMIAR',
+      levelAbove: (years, value) => `nível GloFAS de ${years} anos: ${value} m³/s, acima do gráfico`,
+      forecastStage: 'Cota estimada da previsão (curva-chave)',
       issueDay: 'Emissão da previsão',
       discharge: 'Vazão (m³/s)',
       stage: 'Cota (cm)',
       noTelemetry: 'Esta estação não tem telemetria da ANA; só a previsão é mostrada.',
-      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. Como a vazão do modelo não tem correção de viés, ela é comparada com os níveis de cheia do próprio GloFAS, e o limiar LIMIAR aparece só sobre os dias observados. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
+      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. A linha tracejada de 2 anos é o nível de cheia do próprio GloFAS. A cota prevista converte a vazão do GloFAS pela curva-chave da estação (a válida na data ou, sem ela, a mais recente) e é comparada com os limiares de alerta e de inundação do LIMIAR. Como a vazão do modelo não tem correção de viés, essa cota pode se afastar bastante da que vai ocorrer; acima da faixa da curva-chave, ela não é calculada. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
       officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> e o <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SACE/SGB</a>.',
     },
     provisionalNote: (date) => `dados consistidos pela ANA em geral até ${date}; depois disso, dados brutos e provisórios`,
@@ -503,12 +506,13 @@ const TEXT = {
       observedStage: 'Observed stage (ANA telemetry)',
       glofas: 'GloFAS forecast (model discharge)',
       level: (years) => `GloFAS ${years}-year`,
-      limiarThreshold: 'LIMIAR flood threshold',
+      levelAbove: (years, value) => `GloFAS ${years}-year level: ${value} m³/s, above the chart`,
+      forecastStage: 'Forecast stage (rating curve)',
       issueDay: 'Forecast issue',
       discharge: 'Discharge (m³/s)',
       stage: 'Stage (cm)',
       noTelemetry: 'This station has no ANA telemetry; only the forecast is shown.',
-      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. Model discharge is not bias-corrected, so it is compared with GloFAS’s own flood levels, and the LIMIAR threshold is drawn only over the observed days. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
+      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. The dotted 2-year line is GloFAS’s own flood level. Forecast stage converts GloFAS discharge through the station’s rating curve (the one valid on the date, otherwise the most recent) and is compared with LIMIAR’s warning and flood thresholds. Model discharge is not bias-corrected, so this stage can differ widely from the stage that will occur; above the rating-curve range it is not computed. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
       officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> and <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SGB SACE</a>.',
     },
     provisionalNote: (date) => `ANA consisted data typically through ${date}; raw, provisional data after that`,
@@ -3465,11 +3469,20 @@ const STATION_CHART_RENDERERS = {
   seasonalityChart: renderSeasonality,
 };
 
-const GLOFAS_LEVELS = [
-  { years: 2, key: 'rp2', color: CHART_THEME.alert, dash: [6, 4] },
-  { years: 5, key: 'rp5', color: CHART_THEME.flood, dash: [4, 3] },
-  { years: 20, key: 'rp20', color: CHART_THEME.severe, dash: [2, 3] },
-];
+// Only GloFAS's 2-year level is drawn, so the axis stays scaled to the hydrograph.
+const GLOFAS_LEVEL = { years: 2, key: 'rp2', color: CHART_THEME.alert };
+
+// LIMIAR thresholds for a date: the active interval, or the latest one after the record ends.
+function thresholdsForDate(stationData, dateString) {
+  const intervals = stationData.intervalsHydrated || [];
+  const last = intervals[intervals.length - 1];
+  const interval = findIntervalForDate(stationData, dateString) || (last && dateString > last.endDate ? last : null);
+  return normalizeThresholdTriplet(
+    interval ? interval.alert : null,
+    interval ? interval.flood : stationData.summary.threshold_value,
+    interval ? interval.severe : null,
+  );
+}
 
 function renderForecastChart(stationData) {
   const card = byId('forecastCard');
@@ -3491,31 +3504,56 @@ function renderForecastChart(stationData) {
   const observedStage = byDate(observed.dates, observed.stage_cm);
   const forecastDischarge = byDate(glofas.dates, glofas.discharge_m3s);
   const forecastDates = new Set(glofas.dates);
-  const observedDates = new Set(observed.dates);
-  const hasObservedDischarge = observedDischarge.some(isFiniteNumber);
-  const canShowStage = observedStage.some(isFiniteNumber);
   const valueType = stationData.summary.threshold_value_type;
-  // LIMIAR's flood threshold belongs with the observations, so it is drawn only over observed days.
-  // A stage threshold is shown as discharge through the rating curve, as in the main time series.
-  // Stage gets its own axis only when that is not possible: no telemetered discharge, or a rating
-  // curve that does not reach the threshold stage.
-  const lastObserved = observed.dates[observed.dates.length - 1];
-  const interval = lastObserved ? findIntervalForDate(stationData, lastObserved) : null;
-  const flood = normalizeThresholdTriplet(interval?.alert ?? null, interval ? interval.flood : stationData.summary.threshold_value, interval?.severe ?? null).flood;
-  let limiarFlood = null;
-  let limiarAxis = null;
-  if (valueType !== 'stage_cm') {
-    if (hasObservedDischarge) [limiarFlood, limiarAxis] = [flood, 'y'];
-  } else if (isFiniteNumber(flood) && lastObserved) {
-    const discharge = hasObservedDischarge ? validCurveDischarge(stationData.hydraulic?.ratingCurves || [], lastObserved, flood).discharge : null;
-    if (isFiniteNumber(discharge)) [limiarFlood, limiarAxis] = [discharge, 'y'];
-    else if (canShowStage) [limiarFlood, limiarAxis] = [flood, 'yStage'];
-  }
-  const hasObservedStage = canShowStage && (!hasObservedDischarge || limiarAxis === 'yStage');
-  const limiarLine = labels.map((date) => (observedDates.has(date) && isFiniteNumber(limiarFlood) ? limiarFlood : null));
+  const isStageStation = valueType === 'stage_cm';
+  // Forecast stage: GloFAS discharge through the station's rating curve (valid on the date,
+  // otherwise the most recent). Outside every curve segment there is no stage.
+  const curves = stationData.hydraulic?.ratingCurves || [];
+  const forecastStage = labels.map((date, index) => (
+    forecastDates.has(date) && curves.length ? validCurveStage(curves, date, forecastDischarge[index]).stage : null
+  ));
+  const hasObservedDischarge = observedDischarge.some(isFiniteNumber);
+  const hasObservedStage = observedStage.some(isFiniteNumber);
+  const hasForecastStage = forecastStage.some(isFiniteNumber);
+  const showStage = isStageStation && (hasObservedStage || hasForecastStage);
+  // LIMIAR alert and flood thresholds over the whole chart, on the axis of the station's threshold.
+  const thresholdAxis = isStageStation ? (showStage ? 'yStage' : null) : 'y';
+  const thresholds = labels.map((date) => thresholdsForDate(stationData, date));
+  const thresholdLine = (key, label, color, dash) => ({
+    label,
+    data: thresholds.map((row) => row[key]),
+    yAxisID: thresholdAxis,
+    borderColor: color,
+    pointRadius: 0,
+    borderWidth: 1.8,
+    borderDash: dash,
+    stepped: true,
+    thresholdLabel: label,
+    directLabel: true,
+  });
+  const rp2 = Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]);
+  // Axes fit the hydrographs. GloFAS's 2-year level is drawn only when it is near them; otherwise
+  // the subtitle gives its value. Stage thresholds always set the stage axis, so they stay visible.
+  const flows = [...observedDischarge, ...forecastDischarge].filter(isFiniteNumber);
+  const flowPeak = flows.length ? Math.max(...flows) : null;
+  const showRp2 = Number.isFinite(rp2) && flowPeak != null && rp2 <= 1.5 * flowPeak;
+  const dischargeRange = niceAxisRange([
+    ...flows,
+    ...(showRp2 ? [rp2] : []),
+    ...(thresholdAxis === 'y' ? thresholds.flatMap((row) => [row.alert, row.flood]) : []),
+  ]);
+  const stageRange = showStage ? niceAxisRange([
+    ...observedStage,
+    ...forecastStage,
+    ...thresholds.flatMap((row) => [row.alert, row.flood]),
+  ]) : null;
 
   byId('forecastTitle').textContent = words.title;
-  byId('forecastSubtitle').textContent = `${words.issued} ${formatDate(glofas.issued)} · ${words.modelNote}`;
+  byId('forecastSubtitle').textContent = [
+    `${words.issued} ${formatDate(glofas.issued)}`,
+    words.modelNote,
+    ...(Number.isFinite(rp2) && !showRp2 ? [words.levelAbove(GLOFAS_LEVEL.years, formatNumber(Math.round(rp2)))] : []),
+  ].join(' · ');
   // Static, trusted text from TEXT; no station data goes into this markup.
   byId('forecastNote').innerHTML = `${forecast.observed ? '' : `${words.noTelemetry} `}${words.note} ${words.officialLinks}`;
 
@@ -3542,20 +3580,17 @@ function renderForecastChart(stationData) {
           borderDash: [8, 4],
           tension: 0.12,
         },
-        ...GLOFAS_LEVELS.map((level) => {
-          const value = Number(glofas.flood_levels_m3s?.[level.key]);
-          return {
-            label: words.level(level.years),
-            data: labels.map((date) => (forecastDates.has(date) && Number.isFinite(value) ? value : null)),
-            borderColor: level.color,
-            pointRadius: 0,
-            borderWidth: 1.4,
-            borderDash: level.dash,
-            thresholdLabel: words.level(level.years),
-            directLabel: true,
-          };
-        }),
-        ...(hasObservedStage ? [{
+        ...(showRp2 ? [{
+          label: words.level(GLOFAS_LEVEL.years),
+          data: labels.map((date) => (forecastDates.has(date) ? rp2 : null)),
+          borderColor: GLOFAS_LEVEL.color,
+          pointRadius: 0,
+          borderWidth: 1.2,
+          borderDash: [2, 4],
+          thresholdLabel: words.level(GLOFAS_LEVEL.years),
+          directLabel: true,
+        }] : []),
+        ...(showStage && hasObservedStage ? [{
           label: words.observedStage,
           data: observedStage,
           yAxisID: 'yStage',
@@ -3564,15 +3599,21 @@ function renderForecastChart(stationData) {
           borderWidth: 2.35,
           tension: 0.12,
         }] : []),
-        ...(limiarAxis ? [{
-          label: words.limiarThreshold,
-          data: limiarLine,
-          yAxisID: limiarAxis,
-          borderColor: CHART_THEME.flood,
+        ...(showStage && hasForecastStage ? [{
+          label: words.forecastStage,
+          data: forecastStage,
+          yAxisID: 'yStage',
+          borderColor: CHART_THEME.stage,
           pointRadius: 0,
           borderWidth: 2,
-          stepped: true,
+          borderDash: [3, 3],
+          tension: 0.12,
+          spanGaps: false,
         }] : []),
+        ...(thresholdAxis ? [
+          thresholdLine('alert', text('fields').alert, CHART_THEME.alert, [6, 4]),
+          thresholdLine('flood', text('fields').flood, CHART_THEME.flood, [4, 3]),
+        ] : []),
       ],
     },
     options: {
@@ -3592,10 +3633,11 @@ function renderForecastChart(stationData) {
       }),
       scales: {
         x: chartScale({ maxTicksLimit: 8 }),
-        y: chartScale({ title: words.discharge }),
-        ...(hasObservedStage ? {
+        y: { ...chartScale({ title: words.discharge }), ...(dischargeRange || {}) },
+        ...(showStage ? {
           yStage: {
             ...chartScale({ title: words.stage, position: 'right', tickColor: CHART_THEME.stage }),
+            ...(stageRange || {}),
             grid: { ...chartScale().grid, drawOnChartArea: false },
             title: { display: true, text: words.stage, color: CHART_THEME.stage, font: { size: 12, weight: '600' } },
           },

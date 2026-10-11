@@ -264,3 +264,52 @@ export function continuousDates(...lists) {
   const span = Math.round((Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) - Date.parse(`${dates[0]}T00:00:00Z`)) / 86400000);
   return Array.from({ length: span + 1 }, (_, offset) => addDays(dates[0], offset));
 }
+
+// Inverse of validCurveDischarge: the stage at which a segment carries the discharge, chosen by the
+// same rule (valid on the date first, otherwise the most recent; the latest start date wins).
+// A discharge outside every segment's stage range gets no stage; curves are not extrapolated.
+export function validCurveStage(curves, dateString, dischargeM3s) {
+    const empty = { stage: null, segment: null, validOnDate: null };
+    if (dischargeM3s == null || !Number.isFinite(Number(dischargeM3s)) || !dateString) return empty;
+    const tolerance = 1e-6;
+    const candidates = (curves || [])
+      .map((curve) => ({ curve, stage: ratingStageFromDischarge(dischargeM3s, curve.coefficientA, curve.coefficientH0, curve.coefficientN) }))
+      .filter(({ curve, stage }) => (
+        stage != null && Number.isFinite(curve.stageMin) && Number.isFinite(curve.stageMax)
+        && stage >= curve.stageMin - tolerance && stage <= curve.stageMax + tolerance
+      ));
+    if (!candidates.length) return empty;
+    const latest = (items) => items.reduce(
+      (best, item) => (!best || String(item.curve.validFrom || '') > String(best.curve.validFrom || '') ? item : best),
+      null,
+    );
+    const onDate = candidates.filter(({ curve }) => (
+      (!curve.validFrom || dateString >= curve.validFrom) && (!curve.validTo || dateString <= curve.validTo)
+    ));
+    const pick = latest(onDate.length ? onDate : candidates);
+    return { stage: pick.stage, segment: pick.curve, validOnDate: onDate.length > 0 };
+}
+
+// Axis bounds that fit the values with a margin, rounded to a readable step. Non-negative data
+// keep a non-negative axis.
+export function niceAxisRange(values, padding = 0.08) {
+  const finite = (values || []).filter((value) => value != null).map(Number).filter(Number.isFinite);
+  if (!finite.length) return null;
+  let low = Math.min(...finite);
+  let high = Math.max(...finite);
+  if (low === high) {
+    const half = Math.abs(low) * 0.1 || 1;
+    low -= half;
+    high += half;
+  }
+  const span = high - low;
+  const paddedLow = low - span * padding;
+  const paddedHigh = high + span * padding;
+  // The largest of 1, 0.5 or 0.2 times a power of ten that still gives at least four steps.
+  const magnitude = 10 ** Math.floor(Math.log10(paddedHigh - paddedLow));
+  const step = [1, 0.5, 0.2, 0.1].map((factor) => factor * magnitude).find((candidate) => (paddedHigh - paddedLow) / candidate >= 4);
+  let min = Math.floor(paddedLow / step) * step;
+  const max = Math.ceil(paddedHigh / step) * step;
+  if (low >= 0 && min < 0) min = 0;
+  return { min, max };
+}

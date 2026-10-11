@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const FLOOD_LABEL = 'Flood threshold';
+
 const forecast = {
   station_code: '83250000',
   observed: {
@@ -31,14 +33,17 @@ test('shows the last observed days and the GloFAS forecast when a bundle exists'
   await expect(page.locator('#forecastNote a')).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.Chart.getChart(document.getElementById('forecastChart'))?.data.labels.length)).toBe(5);
   const lines = await page.evaluate(() => Object.fromEntries(window.Chart.getChart(document.getElementById('forecastChart')).data.datasets
-    .map((dataset) => [dataset.label, dataset.data.filter((value) => value != null).length])));
-  expect(lines['Observed discharge (ANA telemetry)']).toBe(3);
-  expect(lines['GloFAS forecast (model discharge)']).toBe(3);
-  // GloFAS flood levels cover only the forecast days; the LIMIAR threshold only the observed ones.
-  expect(lines['GloFAS 2-year']).toBe(3);
-  expect(lines['LIMIAR flood threshold']).toBe(3);
-  // This station's rating curves stop below its bankfull stage, so the threshold stays in stage.
-  expect(lines['Observed stage (ANA telemetry)']).toBe(3);
+    .map((dataset) => [dataset.label, { values: dataset.data.filter((value) => value != null).length, axis: dataset.yAxisID || 'y' }])));
+  expect(lines['Observed discharge (ANA telemetry)'].values).toBe(3);
+  expect(lines['GloFAS forecast (model discharge)'].values).toBe(3);
+  // Only GloFAS's 2-year level is drawn, over the forecast days.
+  expect(lines['GloFAS 2-year'].values).toBe(3);
+  expect(lines['GloFAS 5-year']).toBeUndefined();
+  expect(lines['GloFAS 20-year']).toBeUndefined();
+  // A stage station: observed and forecast stage, and LIMIAR's stage thresholds across the chart.
+  expect(lines['Observed stage (ANA telemetry)']).toEqual({ values: 3, axis: 'yStage' });
+  expect(lines['Forecast stage (rating curve)'].axis).toBe('yStage');
+  expect(lines[FLOOD_LABEL]).toEqual({ values: 5, axis: 'yStage' });
 });
 
 test('hides the forecast card when no bundle exists', async ({ page }) => {
