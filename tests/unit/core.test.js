@@ -248,3 +248,56 @@ describe('provisional (raw ANA) days', () => {
     expect(core.provisionalRuns([])).toEqual([]);
   });
 });
+
+describe('forecast timeline', () => {
+  it('spans the observed days and the forecast without gaps', () => {
+    expect(core.continuousDates(['2026-10-08', '2026-10-09'], ['2026-10-11', '2026-10-12'])).toEqual(['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12']);
+    expect(core.continuousDates(['2026-10-10'], ['2026-10-10'])).toEqual(['2026-10-10']);
+    expect(core.continuousDates([], ['2026-12-31', '2027-01-01'])).toEqual(['2026-12-31', '2027-01-01']);
+    expect(core.continuousDates([], [])).toEqual([]);
+  });
+});
+
+describe('stage from discharge through the rating curve', () => {
+  const curve = (validFrom, validTo, stageMin, stageMax, coefficientA, coefficientH0, coefficientN) => ({
+    validFrom, validTo, stageMin, stageMax, coefficientA, coefficientH0, coefficientN,
+  });
+  const old = curve('2000-01-01', '2010-12-31', 0, 1000, 20, 0, 2);
+  const recent = curve('2015-01-01', '2020-12-31', 0, 1000, 10, 0.5, 2);
+
+  it('inverts the discharge of the curve valid on the date', () => {
+    const { discharge } = core.validCurveDischarge([old, recent], '2018-06-01', 300);
+    const result = core.validCurveStage([old, recent], '2018-06-01', discharge);
+    expect(result.stage).toBeCloseTo(300, 8);
+    expect(result.segment).toBe(recent);
+    expect(result.validOnDate).toBe(true);
+  });
+
+  it('uses the most recent curve after every curve has expired', () => {
+    const result = core.validCurveStage([old, recent], '2026-10-20', 40);
+    expect(result.segment).toBe(recent);
+    expect(result.validOnDate).toBe(false);
+    expect(result.stage).toBeCloseTo((0.5 + Math.sqrt(4)) * 100, 8);
+  });
+
+  it('does not extrapolate beyond the segment stage range', () => {
+    expect(core.validCurveStage([curve('2015-01-01', null, 0, 300, 10, 0.5, 2)], '2026-10-20', 1000).stage).toBeNull();
+    expect(core.validCurveStage([recent], '2026-10-20', null).stage).toBeNull();
+    expect(core.validCurveStage([recent], '2026-10-20', 0).stage).toBeNull();
+    expect(core.validCurveStage([], '2026-10-20', 40).stage).toBeNull();
+  });
+});
+
+describe('axis ranges', () => {
+  it('fits the values with a margin and rounds to a readable step', () => {
+    expect(core.niceAxisRange([16200, 19500, 30450])).toEqual({ min: 14000, max: 32000 });
+    expect(core.niceAxisRange([70, 212, 309])).toEqual({ min: 50, max: 350 });
+  });
+
+  it('keeps non-negative data on a non-negative axis and handles flat or empty input', () => {
+    expect(core.niceAxisRange([0.2, 3, 9]).min).toBe(0);
+    expect(core.niceAxisRange([100, 100])).toEqual({ min: 85, max: 115 });
+    expect(core.niceAxisRange([null, Number.NaN])).toBeNull();
+    expect(core.niceAxisRange([])).toBeNull();
+  });
+});

@@ -916,6 +916,20 @@ h3 {
   color: var(--muted);
 }
 
+.chart-note {
+  margin: 0;
+  padding: 4px 15px 14px;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.chart-note a {
+  color: var(--accent);
+}
+
 .data-version-note {
   margin: -4px 0 12px;
   color: var(--muted);
