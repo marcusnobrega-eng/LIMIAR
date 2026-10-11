@@ -114,6 +114,10 @@ const TEXT = {
       glofas: 'Previsão GloFAS (vazão de modelo)',
       level: (years) => `GloFAS ${years} anos`,
       levelAbove: (years, value) => `nível GloFAS de ${years} anos: ${value} m³/s, acima do gráfico`,
+      band: (date) => `PREVISÃO · emitida em ${date}`,
+      observedBand: 'OBSERVADO',
+      leadDay: (day) => `dia ${day} da previsão`,
+      bias: (value) => `no dia da emissão, o GloFAS está ${formatNumber(Math.abs(value) * 100, 0)}% ${value >= 0 ? 'acima' : 'abaixo'} da vazão observada`,
       forecastStage: 'Cota estimada da previsão (curva-chave)',
       issueDay: 'Emissão da previsão',
       discharge: 'Vazão (m³/s)',
@@ -507,6 +511,10 @@ const TEXT = {
       glofas: 'GloFAS forecast (model discharge)',
       level: (years) => `GloFAS ${years}-year`,
       levelAbove: (years, value) => `GloFAS ${years}-year level: ${value} m³/s, above the chart`,
+      band: (date) => `FORECAST · issued ${date}`,
+      observedBand: 'OBSERVED',
+      leadDay: (day) => `forecast day ${day}`,
+      bias: (value) => `on the issue day GloFAS is ${formatNumber(Math.abs(value) * 100, 0)}% ${value >= 0 ? 'above' : 'below'} the observed flow`,
       forecastStage: 'Forecast stage (rating curve)',
       issueDay: 'Forecast issue',
       discharge: 'Discharge (m³/s)',
@@ -1491,6 +1499,43 @@ const provisionalShadePlugin = {
   },
 };
 
+// A pale yellow band behind the forecast days, labelled with the issue date, so forecast and
+// observation cannot be confused.
+const forecastShadePlugin = {
+  id: 'forecastShade',
+  beforeDatasetsDraw(chart, _args, options) {
+    if (!options?.start || !chart.scales?.x || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const count = chart.data.labels?.length || 1;
+    const halfStep = (chartArea.right - chartArea.left) / Math.max(1, count - 1) / 2;
+    const left = Math.max(chartArea.left, scales.x.getPixelForValue(options.start) - halfStep);
+    const right = Math.min(chartArea.right, scales.x.getPixelForValue(options.end || options.start) + halfStep);
+    if (!(right > left)) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(232, 184, 64, 0.16)';
+    ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+    ctx.strokeStyle = 'rgba(176, 124, 20, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(left) + 0.5, chartArea.top);
+    ctx.lineTo(Math.round(left) + 0.5, chartArea.bottom);
+    ctx.stroke();
+    const fontSize = Number(options.fontSize) || 11;
+    ctx.font = `700 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    if (options.label) {
+      ctx.fillStyle = '#8a5a00';
+      ctx.fillText(options.label, left + 6, chartArea.top + 5);
+    }
+    if (options.observedLabel && left - chartArea.left > ctx.measureText(options.observedLabel).width + 12) {
+      ctx.fillStyle = CHART_THEME.muted;
+      ctx.fillText(options.observedLabel, chartArea.left + 6, chartArea.top + 5);
+    }
+    ctx.restore();
+  },
+};
+
 const selectedDateLinePlugin = {
   id: 'selectedDateLine',
   afterDatasetsDraw(chart, _args, options) {
@@ -1516,7 +1561,7 @@ if (window.Chart?.register) {
   window.Chart.defaults.font.size = 12;
   window.Chart.defaults.elements.line.borderCapStyle = 'round';
   window.Chart.defaults.elements.line.borderJoinStyle = 'round';
-  window.Chart.register(plotFramePlugin, provisionalShadePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
+  window.Chart.register(plotFramePlugin, provisionalShadePlugin, forecastShadePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -3549,9 +3594,14 @@ function renderForecastChart(stationData) {
   ]) : null;
 
   byId('forecastTitle').textContent = words.title;
+  // Bias on the issue day: GloFAS day 1 against the observed flow of the same day (or the latest).
+  const issueObserved = observedDischarge[labels.indexOf(glofas.dates[0])] ?? [...observedDischarge].reverse().find(isFiniteNumber);
+  const issueForecast = forecastDischarge[labels.indexOf(glofas.dates[0])];
+  const bias = isFiniteNumber(issueObserved) && issueObserved > 0 && isFiniteNumber(issueForecast) ? issueForecast / issueObserved - 1 : null;
   byId('forecastSubtitle').textContent = [
-    `${words.issued} ${formatDate(glofas.issued)}`,
+    `${words.issued} ${formatDate(glofas.issued)}, 00:00 UTC`,
     words.modelNote,
+    ...(bias == null ? [] : [words.bias(bias)]),
     ...(Number.isFinite(rp2) && !showRp2 ? [words.levelAbove(GLOFAS_LEVEL.years, formatNumber(Math.round(rp2)))] : []),
   ].join(' · ');
   // Static, trusted text from TEXT; no station data goes into this markup.
@@ -3629,7 +3679,22 @@ function renderForecastChart(stationData) {
           },
         }),
         thresholdLabels: { enabled: true },
-        selectedDateLine: { value: glofas.issued },
+        forecastShade: {
+          start: glofas.dates[0],
+          end: glofas.dates[glofas.dates.length - 1],
+          label: words.band(formatDate(glofas.issued)),
+          observedLabel: forecast.observed ? words.observedBand : '',
+        },
+        tooltip: {
+          ...chartPlugins().tooltip,
+          callbacks: {
+            title(items) {
+              const date = items[0]?.label;
+              const lead = glofas.dates.indexOf(date);
+              return lead >= 0 ? `${formatDate(date)} · ${words.leadDay(lead + 1)}` : formatDate(date);
+            },
+          },
+        },
       }),
       scales: {
         x: chartScale({ maxTicksLimit: 8 }),
