@@ -32,18 +32,26 @@ test('shows the last observed days and the GloFAS forecast when a bundle exists'
   await expect(page.locator('#forecastSubtitle')).toContainText('raw GloFAS, not scaled to observations');
   await expect(page.locator('#forecastNote a')).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.Chart.getChart(document.getElementById('forecastChart'))?.data.labels.length)).toBe(5);
-  const lines = await page.evaluate(() => Object.fromEntries(window.Chart.getChart(document.getElementById('forecastChart')).data.datasets
-    .map((dataset) => [dataset.label, { values: dataset.data.filter((value) => value != null).length, axis: dataset.yAxisID || 'y' }])));
-  expect(lines['Observed discharge (ANA telemetry)'].values).toBe(3);
-  expect(lines['GloFAS forecast (model discharge)'].values).toBe(3);
+  const lines = (id) => page.evaluate((chartId) => Object.fromEntries(window.Chart.getChart(document.getElementById(chartId)).data.datasets
+    .map((dataset) => [dataset.label, dataset.data.filter((value) => value != null).length])), id);
+  const discharge = await lines('forecastChart');
+  expect(discharge['Observed discharge (ANA telemetry)']).toBe(3);
+  expect(discharge['GloFAS forecast (model discharge)']).toBe(3);
   // Only GloFAS's 2-year level is drawn, over the forecast days.
-  expect(lines['GloFAS 2-year'].values).toBe(3);
-  expect(lines['GloFAS 5-year']).toBeUndefined();
-  expect(lines['GloFAS 20-year']).toBeUndefined();
-  // A stage station: observed and forecast stage, and LIMIAR's stage thresholds across the chart.
-  expect(lines['Observed stage (ANA telemetry)']).toEqual({ values: 3, axis: 'yStage' });
-  expect(lines['Forecast stage (rating curve)'].axis).toBe('yStage');
-  expect(lines[FLOOD_LABEL]).toEqual({ values: 5, axis: 'yStage' });
+  expect(discharge['GloFAS 2-year']).toBe(3);
+  expect(discharge['GloFAS 5-year']).toBeUndefined();
+  expect(discharge['Observed stage (ANA telemetry)']).toBeUndefined();
+
+  // Stage has its own chart: observed and forecast stage with LIMIAR's stage thresholds.
+  const stageCard = page.locator('#forecastStageCard');
+  await expect(stageCard).toBeVisible();
+  await stageCard.scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => Boolean(window.Chart.getChart(document.getElementById('forecastStageChart'))))).toBe(true);
+  const stage = await lines('forecastStageChart');
+  expect(stage['Observed stage (ANA telemetry)']).toBe(3);
+  expect(stage['Forecast stage (rating curve)']).toBeGreaterThan(0);
+  expect(stage[FLOOD_LABEL]).toBe(5);
+  expect(stage['Observed discharge (ANA telemetry)']).toBeUndefined();
 });
 
 test('draws the scaled forecast with raw GloFAS as a reference and says how it was scaled', async ({ page }) => {

@@ -107,6 +107,10 @@ const TEXT = {
     dataVersion: 'Versão dos dados',
     forecast: {
       title: 'Últimos 30 dias e previsão (experimental)',
+      titleDischarge: 'Vazão: últimos 30 dias e previsão (experimental)',
+      titleStage: 'Cota: últimos 30 dias e previsão (experimental)',
+      stageFromScaled: 'cota prevista = previsão ajustada convertida pela curva-chave da estação',
+      stageFromRaw: 'cota prevista = GloFAS bruto convertido pela curva-chave da estação',
       issued: 'Previsão GloFAS emitida em',
       observedDischarge: 'Vazão observada (telemetria ANA)',
       observedStage: 'Cota observada (telemetria ANA)',
@@ -512,6 +516,10 @@ const TEXT = {
     dataVersion: 'Data version',
     forecast: {
       title: 'Last 30 days and forecast (experimental)',
+      titleDischarge: 'Discharge: last 30 days and forecast (experimental)',
+      titleStage: 'Stage: last 30 days and forecast (experimental)',
+      stageFromScaled: 'forecast stage = scaled forecast converted through the station’s rating curve',
+      stageFromRaw: 'forecast stage = raw GloFAS converted through the station’s rating curve',
       issued: 'GloFAS forecast issued',
       observedDischarge: 'Observed discharge (ANA telemetry)',
       observedStage: 'Observed stage (ANA telemetry)',
@@ -3524,6 +3532,7 @@ function destroyChart(id) {
 const STATION_CHART_RENDERERS = {
   timeseriesChart: renderTimeseriesChart,
   forecastChart: renderForecastChart,
+  forecastStageChart: renderForecastStageChart,
   crossSectionChart: renderCrossSectionChart,
   dynamicDailyChart: renderDynamicDailyChart,
   ratingCurveChart: renderRatingCurveChart,
@@ -3546,15 +3555,11 @@ function thresholdsForDate(stationData, dateString) {
   );
 }
 
-function renderForecastChart(stationData) {
-  const card = byId('forecastCard');
-  const forecast = state.selectedForecast?.station_code === stationData.metadata.station_code ? state.selectedForecast : null;
-  card.hidden = !forecast;
-  if (!forecast) {
-    destroyChart('forecastChart');
-    return;
-  }
-  const words = text('forecast');
+// Everything both forecast charts need, as numbers on one daily timeline. LIMIAR's warning and flood
+// thresholds are given in discharge and in stage: a stage threshold goes to discharge through the
+// rating curve, and a discharge threshold to stage through its inverse (valid on the date, otherwise
+// the most recent; no extrapolation).
+function buildForecastModel(stationData, forecast) {
   const observed = forecast.observed || { dates: [], stage_cm: [], discharge_m3s: [] };
   const glofas = forecast.glofas;
   const labels = continuousDates(observed.dates, glofas.dates);
@@ -3562,63 +3567,138 @@ function renderForecastChart(stationData) {
     const lookup = new Map(dates.map((date, index) => [date, values?.[index]]));
     return labels.map((date) => lookup.get(date) ?? null);
   };
-  const observedDischarge = byDate(observed.dates, observed.discharge_m3s);
-  const observedStage = byDate(observed.dates, observed.stage_cm);
-  const rawForecast = byDate(glofas.dates, glofas.discharge_m3s);
   // Scaled forecast: GloFAS x k, with k from the pipeline (median ratio of observed flow to GloFAS's
   // first forecast day over the last complete days). When it applies, it is the forecast used for
-  // stage and thresholds, and raw GloFAS stays as a faint reference line.
+  // stage, and raw GloFAS stays as a faint reference line.
   const scaling = glofas.scaled || { status: 'unavailable' };
   const isScaled = scaling.status === 'applied' && Array.isArray(scaling.discharge_m3s);
   const factor = isScaled ? Number(scaling.factor) : 1;
+  const rawForecast = byDate(glofas.dates, glofas.discharge_m3s);
   const forecastDischarge = isScaled ? byDate(glofas.dates, scaling.discharge_m3s) : rawForecast;
   const forecastDates = new Set(glofas.dates);
-  const valueType = stationData.summary.threshold_value_type;
-  const isStageStation = valueType === 'stage_cm';
-  // Forecast stage: GloFAS discharge through the station's rating curve (valid on the date,
-  // otherwise the most recent). Outside every curve segment there is no stage.
   const curves = stationData.hydraulic?.ratingCurves || [];
   const forecastStage = labels.map((date, index) => (
     forecastDates.has(date) && curves.length ? validCurveStage(curves, date, forecastDischarge[index]).stage : null
   ));
-  const hasObservedDischarge = observedDischarge.some(isFiniteNumber);
-  const hasObservedStage = observedStage.some(isFiniteNumber);
-  const hasForecastStage = forecastStage.some(isFiniteNumber);
-  const showStage = isStageStation && (hasObservedStage || hasForecastStage);
-  // LIMIAR alert and flood thresholds over the whole chart, on the axis of the station's threshold.
-  const thresholdAxis = isStageStation ? (showStage ? 'yStage' : null) : 'y';
-  const thresholds = labels.map((date) => thresholdsForDate(stationData, date));
-  const thresholdLine = (key, label, color, dash) => ({
-    label,
-    data: thresholds.map((row) => row[key]),
-    yAxisID: thresholdAxis,
-    borderColor: color,
-    pointRadius: 0,
-    borderWidth: 1.8,
-    borderDash: dash,
-    stepped: true,
-    thresholdLabel: label,
-    directLabel: true,
-  });
-  // The 2-year level is scaled by the same k, so it stays comparable with the scaled forecast.
-  const rp2 = Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]) * factor;
-  // Axes fit the hydrographs. GloFAS's 2-year level is drawn only when it is near them; otherwise
-  // the subtitle gives its value. Stage thresholds always set the stage axis, so they stay visible.
-  const flows = [...observedDischarge, ...forecastDischarge, ...(isScaled ? rawForecast : [])].filter(isFiniteNumber);
+  const isStageStation = stationData.summary.threshold_value_type === 'stage_cm';
+  const native = labels.map((date) => thresholdsForDate(stationData, date));
+  const convert = (date, value) => {
+    if (!isFiniteNumber(value) || !curves.length) return null;
+    return isStageStation ? validCurveDischarge(curves, date, value).discharge : validCurveStage(curves, date, value).stage;
+  };
+  const converted = native.map((row, index) => ({
+    alert: convert(labels[index], row.alert),
+    flood: convert(labels[index], row.flood),
+  }));
+  return {
+    labels,
+    glofas,
+    scaling,
+    isScaled,
+    factor,
+    hasTelemetry: Boolean(forecast.observed),
+    forecastDates,
+    observedDischarge: byDate(observed.dates, observed.discharge_m3s),
+    observedStage: byDate(observed.dates, observed.stage_cm),
+    rawForecast,
+    forecastDischarge,
+    forecastStage,
+    // The 2-year level is scaled by the same k, so it stays comparable with the scaled forecast.
+    rp2: Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]) * factor,
+    dischargeThresholds: isStageStation ? converted : native,
+    stageThresholds: isStageStation ? native : converted,
+  };
+}
+
+function forecastStageAvailable(model) {
+  return [...model.observedStage, ...model.forecastStage].some(isFiniteNumber);
+}
+
+function forecastThresholdLines(thresholds) {
+  return [
+    ['alert', text('fields').alert, CHART_THEME.alert, [6, 4]],
+    ['flood', text('fields').flood, CHART_THEME.flood, [4, 3]],
+  ]
+    .filter(([key]) => thresholds.some((row) => isFiniteNumber(row[key])))
+    .map(([key, label, color, dash]) => ({
+      label,
+      data: thresholds.map((row) => row[key]),
+      borderColor: color,
+      pointRadius: 0,
+      borderWidth: 1.8,
+      borderDash: dash,
+      stepped: true,
+      thresholdLabel: label,
+      directLabel: true,
+    }));
+}
+
+function forecastChartOptions(model, words, yTitle, range, yColor) {
+  const { glofas } = model;
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    normalized: true,
+    interaction: { intersect: false, mode: 'index' },
+    layout: { padding: { top: 4 } },
+    plugins: chartPlugins({
+      legend: chartLegend({
+        filter(item, data) {
+          return data.datasets[item.datasetIndex]?.directLabel !== true;
+        },
+      }),
+      thresholdLabels: { enabled: true },
+      forecastShade: {
+        start: glofas.dates[0],
+        end: glofas.dates[glofas.dates.length - 1],
+        label: words.band(formatDate(glofas.issued)),
+        observedLabel: model.hasTelemetry ? words.observedBand : '',
+      },
+      tooltip: {
+        ...chartPlugins().tooltip,
+        callbacks: {
+          title(items) {
+            const date = items[0]?.label;
+            const lead = glofas.dates.indexOf(date);
+            return lead >= 0 ? `${formatDate(date)} · ${words.leadDay(lead + 1)}` : formatDate(date);
+          },
+        },
+      },
+    }),
+    scales: {
+      x: chartScale({ maxTicksLimit: 8 }),
+      y: {
+        ...chartScale({ title: yTitle, tickColor: yColor }),
+        ...(range || {}),
+        title: { display: true, text: yTitle, color: yColor || CHART_THEME.muted, font: { size: 12, weight: '600' } },
+      },
+    },
+  };
+}
+
+function currentForecastModel(stationData) {
+  const forecast = state.selectedForecast?.station_code === stationData.metadata.station_code ? state.selectedForecast : null;
+  return forecast ? buildForecastModel(stationData, forecast) : null;
+}
+
+function renderForecastChart(stationData) {
+  const model = currentForecastModel(stationData);
+  byId('forecastCard').hidden = !model;
+  if (!model) {
+    destroyChart('forecastChart');
+    return;
+  }
+  const words = text('forecast');
+  const { labels, glofas, scaling, isScaled, factor, rp2 } = model;
+  // The axis fits the hydrographs and the thresholds. GloFAS's 2-year level is drawn only when it
+  // is near the flows; otherwise the subtitle gives its value.
+  const flows = [...model.observedDischarge, ...model.forecastDischarge, ...(isScaled ? model.rawForecast : [])].filter(isFiniteNumber);
   const flowPeak = flows.length ? Math.max(...flows) : null;
   const showRp2 = Number.isFinite(rp2) && flowPeak != null && rp2 <= 1.5 * flowPeak;
-  const dischargeRange = niceAxisRange([
-    ...flows,
-    ...(showRp2 ? [rp2] : []),
-    ...(thresholdAxis === 'y' ? thresholds.flatMap((row) => [row.alert, row.flood]) : []),
-  ]);
-  const stageRange = showStage ? niceAxisRange([
-    ...observedStage,
-    ...forecastStage,
-    ...thresholds.flatMap((row) => [row.alert, row.flood]),
-  ]) : null;
+  const thresholdLines = forecastThresholdLines(model.dischargeThresholds);
+  const range = niceAxisRange([...flows, ...(showRp2 ? [rp2] : []), ...thresholdLines.flatMap((line) => line.data)]);
 
-  byId('forecastTitle').textContent = words.title;
+  byId('forecastTitle').textContent = words.titleDischarge;
   byId('forecastSubtitle').textContent = [
     `${words.issued} ${formatDate(glofas.issued)}, 00:00 UTC`,
     isScaled
@@ -3627,7 +3707,7 @@ function renderForecastChart(stationData) {
     ...(Number.isFinite(rp2) && !showRp2 ? [words.levelAbove(GLOFAS_LEVEL.years, formatNumber(Math.round(rp2)))] : []),
   ].join(' · ');
   // Static, trusted text from TEXT; no station data goes into this markup.
-  byId('forecastNote').innerHTML = `${forecast.observed ? '' : `${words.noTelemetry} `}${words.note} ${words.officialLinks}`;
+  byId('forecastNote').innerHTML = `${model.hasTelemetry ? '' : `${words.noTelemetry} `}${words.note} ${words.officialLinks}`;
 
   destroyChart('forecastChart');
   state.charts.forecastChart = new Chart(byId('forecastChart'), {
@@ -3635,9 +3715,9 @@ function renderForecastChart(stationData) {
     data: {
       labels,
       datasets: [
-        ...(hasObservedDischarge ? [{
+        ...(model.observedDischarge.some(isFiniteNumber) ? [{
           label: words.observedDischarge,
-          data: observedDischarge,
+          data: model.observedDischarge,
           borderColor: CHART_THEME.discharge,
           pointRadius: 0,
           borderWidth: 2.35,
@@ -3645,7 +3725,7 @@ function renderForecastChart(stationData) {
         }] : []),
         {
           label: isScaled ? words.scaledForecast(formatNumber(factor, 2)) : words.glofas,
-          data: forecastDischarge,
+          data: model.forecastDischarge,
           borderColor: CURVE_COLORS[7],
           pointRadius: 0,
           borderWidth: isScaled ? 2.6 : 2.2,
@@ -3654,7 +3734,7 @@ function renderForecastChart(stationData) {
         },
         ...(isScaled ? [{
           label: words.rawForecast,
-          data: rawForecast,
+          data: model.rawForecast,
           borderColor: 'rgba(102, 58, 112, 0.38)',
           pointRadius: 0,
           borderWidth: 1.4,
@@ -3663,7 +3743,7 @@ function renderForecastChart(stationData) {
         }] : []),
         ...(showRp2 ? [{
           label: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
-          data: labels.map((date) => (forecastDates.has(date) ? rp2 : null)),
+          data: labels.map((date) => (model.forecastDates.has(date) ? rp2 : null)),
           borderColor: GLOFAS_LEVEL.color,
           pointRadius: 0,
           borderWidth: 1.2,
@@ -3671,75 +3751,57 @@ function renderForecastChart(stationData) {
           thresholdLabel: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
           directLabel: true,
         }] : []),
-        ...(showStage && hasObservedStage ? [{
+        ...thresholdLines,
+      ],
+    },
+    options: forecastChartOptions(model, words, words.discharge, range),
+  });
+}
+
+function renderForecastStageChart(stationData) {
+  const model = currentForecastModel(stationData);
+  const visible = Boolean(model) && forecastStageAvailable(model);
+  byId('forecastStageCard').hidden = !visible;
+  if (!visible) {
+    destroyChart('forecastStageChart');
+    return;
+  }
+  const words = text('forecast');
+  const thresholdLines = forecastThresholdLines(model.stageThresholds);
+  const range = niceAxisRange([...model.observedStage, ...model.forecastStage, ...thresholdLines.flatMap((line) => line.data)]);
+  byId('forecastStageTitle').textContent = words.titleStage;
+  byId('forecastStageSubtitle').textContent = [
+    `${words.issued} ${formatDate(model.glofas.issued)}, 00:00 UTC`,
+    model.isScaled ? words.stageFromScaled : words.stageFromRaw,
+  ].join(' · ');
+
+  destroyChart('forecastStageChart');
+  state.charts.forecastStageChart = new Chart(byId('forecastStageChart'), {
+    type: 'line',
+    data: {
+      labels: model.labels,
+      datasets: [
+        ...(model.observedStage.some(isFiniteNumber) ? [{
           label: words.observedStage,
-          data: observedStage,
-          yAxisID: 'yStage',
+          data: model.observedStage,
           borderColor: CHART_THEME.stage,
           pointRadius: 0,
           borderWidth: 2.35,
           tension: 0.12,
         }] : []),
-        ...(showStage && hasForecastStage ? [{
+        ...(model.forecastStage.some(isFiniteNumber) ? [{
           label: words.forecastStage,
-          data: forecastStage,
-          yAxisID: 'yStage',
-          borderColor: CHART_THEME.stage,
+          data: model.forecastStage,
+          borderColor: CURVE_COLORS[7],
           pointRadius: 0,
-          borderWidth: 2,
-          borderDash: [3, 3],
+          borderWidth: 2.6,
           tension: 0.12,
           spanGaps: false,
         }] : []),
-        ...(thresholdAxis ? [
-          thresholdLine('alert', text('fields').alert, CHART_THEME.alert, [6, 4]),
-          thresholdLine('flood', text('fields').flood, CHART_THEME.flood, [4, 3]),
-        ] : []),
+        ...thresholdLines,
       ],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      normalized: true,
-      interaction: { intersect: false, mode: 'index' },
-      layout: { padding: { top: 4 } },
-      plugins: chartPlugins({
-        legend: chartLegend({
-          filter(item, data) {
-            return data.datasets[item.datasetIndex]?.directLabel !== true;
-          },
-        }),
-        thresholdLabels: { enabled: true },
-        forecastShade: {
-          start: glofas.dates[0],
-          end: glofas.dates[glofas.dates.length - 1],
-          label: words.band(formatDate(glofas.issued)),
-          observedLabel: forecast.observed ? words.observedBand : '',
-        },
-        tooltip: {
-          ...chartPlugins().tooltip,
-          callbacks: {
-            title(items) {
-              const date = items[0]?.label;
-              const lead = glofas.dates.indexOf(date);
-              return lead >= 0 ? `${formatDate(date)} · ${words.leadDay(lead + 1)}` : formatDate(date);
-            },
-          },
-        },
-      }),
-      scales: {
-        x: chartScale({ maxTicksLimit: 8 }),
-        y: { ...chartScale({ title: words.discharge }), ...(dischargeRange || {}) },
-        ...(showStage ? {
-          yStage: {
-            ...chartScale({ title: words.stage, position: 'right', tickColor: CHART_THEME.stage }),
-            ...(stageRange || {}),
-            grid: { ...chartScale().grid, drawOnChartArea: false },
-            title: { display: true, text: words.stage, color: CHART_THEME.stage, font: { size: 12, weight: '600' } },
-          },
-        } : {}),
-      },
-    },
+    options: forecastChartOptions(model, words, words.stage, range, CHART_THEME.stage),
   });
 }
 
@@ -4702,7 +4764,9 @@ async function selectStation(stationCode) {
     state.selectedData = data;
     state.selectedForecast = forecast;
     // Shown before the charts render: the lazy renderer only sees cards that are on screen.
-    byId('forecastCard').hidden = !forecast;
+    const forecastModel = forecast ? buildForecastModel(data, forecast) : null;
+    byId('forecastCard').hidden = !forecastModel;
+    byId('forecastStageCard').hidden = !(forecastModel && forecastStageAvailable(forecastModel));
     renderStatusCard(data);
     renderMetadata(data);
     renderEventSummary(data);
@@ -6025,7 +6089,7 @@ async function exportStationReport() {
 }
 
 const MAXIMIZABLE_CHARTS = [
-  'timeseriesChart', 'forecastChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
+  'timeseriesChart', 'forecastChart', 'forecastStageChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
   'seasonalityChart', 'dailyConditionsChart', 'dailyLatitudeChart', 'dailyLongitudeChart',
 ];
 const MAXIMIZE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
