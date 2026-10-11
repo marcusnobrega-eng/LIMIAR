@@ -108,7 +108,6 @@ const TEXT = {
     forecast: {
       title: 'Últimos 30 dias e previsão (experimental)',
       issued: 'Previsão GloFAS emitida em',
-      modelNote: 'vazão de modelo, sem correção de viés',
       observedDischarge: 'Vazão observada (telemetria ANA)',
       observedStage: 'Cota observada (telemetria ANA)',
       glofas: 'Previsão GloFAS (vazão de modelo)',
@@ -117,13 +116,22 @@ const TEXT = {
       band: (date) => `PREVISÃO · emitida em ${date}`,
       observedBand: 'OBSERVADO',
       leadDay: (day) => `dia ${day} da previsão`,
-      bias: (value) => `no dia da emissão, o GloFAS está ${formatNumber(Math.abs(value) * 100, 0)}% ${value >= 0 ? 'acima' : 'abaixo'} da vazão observada`,
+      scaled: (k, days, start, end) => `previsão ajustada à observação: GloFAS × ${k} (mediana de ${days} dias, ${start} a ${end})`,
+      notScaled: {
+        unavailable: () => 'GloFAS bruto, sem ajuste à observação',
+        no_telemetry: () => 'GloFAS bruto, sem ajuste: a estação não tem vazão por telemetria',
+        too_few_days: () => 'GloFAS bruto, sem ajuste: menos de 3 dias completos de telemetria para comparar',
+        out_of_range: (k) => `GloFAS bruto, sem ajuste: o GloFAS difere da observação por mais de 5 vezes (k = ${k}); este rio não está bem representado no modelo`,
+      },
+      scaledForecast: (k) => `Previsão ajustada (GloFAS × ${k})`,
+      rawForecast: 'GloFAS bruto',
+      scaledLevel: (years) => `GloFAS ${years} anos × k`,
       forecastStage: 'Cota estimada da previsão (curva-chave)',
       issueDay: 'Emissão da previsão',
       discharge: 'Vazão (m³/s)',
       stage: 'Cota (cm)',
       noTelemetry: 'Esta estação não tem telemetria da ANA; só a previsão é mostrada.',
-      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. A linha tracejada de 2 anos é o nível de cheia do próprio GloFAS. A cota prevista converte a vazão do GloFAS pela curva-chave da estação (a válida na data ou, sem ela, a mais recente) e é comparada com os limiares de alerta e de inundação do LIMIAR. Como a vazão do modelo não tem correção de viés, essa cota pode se afastar bastante da que vai ocorrer; acima da faixa da curva-chave, ela não é calculada. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
+      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. Ajuste à observação: a previsão é multiplicada por k, a mediana, nos últimos 7 dias completos, da razão entre a vazão observada e a vazão do primeiro dia de cada previsão do GloFAS para o mesmo dia. O ajuste remove um desvio proporcional constante; não corrige erros de tempo nem erros que mudam com a vazão, e é aplicado só com pelo menos 3 dias e k entre 0,2 e 5. O nível de 2 anos do GloFAS é multiplicado pelo mesmo k. A cota prevista converte a vazão prevista pela curva-chave da estação (a válida na data ou, sem ela, a mais recente) e é comparada com os limiares de alerta e de inundação do LIMIAR. Mesmo com o ajuste, essa cota pode se afastar da que vai ocorrer, e mais nos últimos dias da previsão; acima da faixa da curva-chave, ela não é calculada. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
       officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> e o <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SACE/SGB</a>.',
     },
     provisionalNote: (date) => `dados consistidos pela ANA em geral até ${date}; depois disso, dados brutos e provisórios`,
@@ -505,7 +513,6 @@ const TEXT = {
     forecast: {
       title: 'Last 30 days and forecast (experimental)',
       issued: 'GloFAS forecast issued',
-      modelNote: 'model discharge, not bias-corrected',
       observedDischarge: 'Observed discharge (ANA telemetry)',
       observedStage: 'Observed stage (ANA telemetry)',
       glofas: 'GloFAS forecast (model discharge)',
@@ -514,13 +521,22 @@ const TEXT = {
       band: (date) => `FORECAST · issued ${date}`,
       observedBand: 'OBSERVED',
       leadDay: (day) => `forecast day ${day}`,
-      bias: (value) => `on the issue day GloFAS is ${formatNumber(Math.abs(value) * 100, 0)}% ${value >= 0 ? 'above' : 'below'} the observed flow`,
+      scaled: (k, days, start, end) => `forecast scaled to observations: GloFAS × ${k} (median of ${days} days, ${start} to ${end})`,
+      notScaled: {
+        unavailable: () => 'raw GloFAS, not scaled to observations',
+        no_telemetry: () => 'raw GloFAS, not scaled: the station has no telemetered discharge',
+        too_few_days: () => 'raw GloFAS, not scaled: fewer than 3 complete days of telemetry to compare',
+        out_of_range: (k) => `raw GloFAS, not scaled: GloFAS differs from the observations by more than 5 times (k = ${k}); the model does not represent this river well`,
+      },
+      scaledForecast: (k) => `Scaled forecast (GloFAS × ${k})`,
+      rawForecast: 'Raw GloFAS',
+      scaledLevel: (years) => `GloFAS ${years}-year × k`,
       forecastStage: 'Forecast stage (rating curve)',
       issueDay: 'Forecast issue',
       discharge: 'Discharge (m³/s)',
       stage: 'Stage (cm)',
       noTelemetry: 'This station has no ANA telemetry; only the forecast is shown.',
-      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. The dotted 2-year line is GloFAS’s own flood level. Forecast stage converts GloFAS discharge through the station’s rating curve (the one valid on the date, otherwise the most recent) and is compared with LIMIAR’s warning and flood thresholds. Model discharge is not bias-corrected, so this stage can differ widely from the stage that will occur; above the rating-curve range it is not computed. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
+      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. Scaling to observations: the forecast is multiplied by k, the median over the last 7 complete days of observed flow divided by GloFAS’s first-day forecast for the same day. It removes a constant proportional offset; it does not correct timing errors or errors that change with flow, and it is applied only with at least 3 days and k between 0.2 and 5. GloFAS’s 2-year level is multiplied by the same k. Forecast stage converts the forecast discharge through the station’s rating curve (the one valid on the date, otherwise the most recent) and is compared with LIMIAR’s warning and flood thresholds. Even after scaling, this stage can differ from the stage that will occur, more so in the later forecast days; above the rating-curve range it is not computed. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
       officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> and <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SGB SACE</a>.',
     },
     provisionalNote: (date) => `ANA consisted data typically through ${date}; raw, provisional data after that`,
@@ -3369,7 +3385,8 @@ async function loadForecast(stationCode) {
   if (state.forecastCache.has(stationCode)) return state.forecastCache.get(stationCode);
   let forecast = null;
   try {
-    const response = await fetch(`forecast/stations/${stationCode}.json`);
+    // The file keeps its name but changes every day, so the browser must revalidate it.
+    const response = await fetch(`forecast/stations/${stationCode}.json`, { cache: 'no-cache' });
     if (response.ok) forecast = await response.json();
   } catch {
     forecast = null;
@@ -3547,7 +3564,14 @@ function renderForecastChart(stationData) {
   };
   const observedDischarge = byDate(observed.dates, observed.discharge_m3s);
   const observedStage = byDate(observed.dates, observed.stage_cm);
-  const forecastDischarge = byDate(glofas.dates, glofas.discharge_m3s);
+  const rawForecast = byDate(glofas.dates, glofas.discharge_m3s);
+  // Scaled forecast: GloFAS x k, with k from the pipeline (median ratio of observed flow to GloFAS's
+  // first forecast day over the last complete days). When it applies, it is the forecast used for
+  // stage and thresholds, and raw GloFAS stays as a faint reference line.
+  const scaling = glofas.scaled || { status: 'unavailable' };
+  const isScaled = scaling.status === 'applied' && Array.isArray(scaling.discharge_m3s);
+  const factor = isScaled ? Number(scaling.factor) : 1;
+  const forecastDischarge = isScaled ? byDate(glofas.dates, scaling.discharge_m3s) : rawForecast;
   const forecastDates = new Set(glofas.dates);
   const valueType = stationData.summary.threshold_value_type;
   const isStageStation = valueType === 'stage_cm';
@@ -3576,10 +3600,11 @@ function renderForecastChart(stationData) {
     thresholdLabel: label,
     directLabel: true,
   });
-  const rp2 = Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]);
+  // The 2-year level is scaled by the same k, so it stays comparable with the scaled forecast.
+  const rp2 = Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]) * factor;
   // Axes fit the hydrographs. GloFAS's 2-year level is drawn only when it is near them; otherwise
   // the subtitle gives its value. Stage thresholds always set the stage axis, so they stay visible.
-  const flows = [...observedDischarge, ...forecastDischarge].filter(isFiniteNumber);
+  const flows = [...observedDischarge, ...forecastDischarge, ...(isScaled ? rawForecast : [])].filter(isFiniteNumber);
   const flowPeak = flows.length ? Math.max(...flows) : null;
   const showRp2 = Number.isFinite(rp2) && flowPeak != null && rp2 <= 1.5 * flowPeak;
   const dischargeRange = niceAxisRange([
@@ -3594,14 +3619,11 @@ function renderForecastChart(stationData) {
   ]) : null;
 
   byId('forecastTitle').textContent = words.title;
-  // Bias on the issue day: GloFAS day 1 against the observed flow of the same day (or the latest).
-  const issueObserved = observedDischarge[labels.indexOf(glofas.dates[0])] ?? [...observedDischarge].reverse().find(isFiniteNumber);
-  const issueForecast = forecastDischarge[labels.indexOf(glofas.dates[0])];
-  const bias = isFiniteNumber(issueObserved) && issueObserved > 0 && isFiniteNumber(issueForecast) ? issueForecast / issueObserved - 1 : null;
   byId('forecastSubtitle').textContent = [
     `${words.issued} ${formatDate(glofas.issued)}, 00:00 UTC`,
-    words.modelNote,
-    ...(bias == null ? [] : [words.bias(bias)]),
+    isScaled
+      ? words.scaled(formatNumber(factor, 2), scaling.n_days, formatDate(scaling.window[0]), formatDate(scaling.window[1]))
+      : words.notScaled[scaling.status](scaling.factor == null ? null : formatNumber(Number(scaling.factor), 2)),
     ...(Number.isFinite(rp2) && !showRp2 ? [words.levelAbove(GLOFAS_LEVEL.years, formatNumber(Math.round(rp2)))] : []),
   ].join(' · ');
   // Static, trusted text from TEXT; no station data goes into this markup.
@@ -3622,22 +3644,31 @@ function renderForecastChart(stationData) {
           tension: 0.12,
         }] : []),
         {
-          label: words.glofas,
+          label: isScaled ? words.scaledForecast(formatNumber(factor, 2)) : words.glofas,
           data: forecastDischarge,
           borderColor: CURVE_COLORS[7],
           pointRadius: 0,
-          borderWidth: 2.2,
-          borderDash: [8, 4],
+          borderWidth: isScaled ? 2.6 : 2.2,
+          borderDash: isScaled ? [] : [8, 4],
           tension: 0.12,
         },
+        ...(isScaled ? [{
+          label: words.rawForecast,
+          data: rawForecast,
+          borderColor: 'rgba(102, 58, 112, 0.38)',
+          pointRadius: 0,
+          borderWidth: 1.4,
+          borderDash: [5, 4],
+          tension: 0.12,
+        }] : []),
         ...(showRp2 ? [{
-          label: words.level(GLOFAS_LEVEL.years),
+          label: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
           data: labels.map((date) => (forecastDates.has(date) ? rp2 : null)),
           borderColor: GLOFAS_LEVEL.color,
           pointRadius: 0,
           borderWidth: 1.2,
           borderDash: [2, 4],
-          thresholdLabel: words.level(GLOFAS_LEVEL.years),
+          thresholdLabel: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
           directLabel: true,
         }] : []),
         ...(showStage && hasObservedStage ? [{

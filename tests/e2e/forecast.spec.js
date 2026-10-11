@@ -29,7 +29,7 @@ test('shows the last observed days and the GloFAS forecast when a bundle exists'
   await expect(card).toBeVisible({ timeout: 30_000 });
   // Charts render when their card scrolls into view.
   await card.scrollIntoViewIfNeeded();
-  await expect(page.locator('#forecastSubtitle')).toContainText('not bias-corrected');
+  await expect(page.locator('#forecastSubtitle')).toContainText('raw GloFAS, not scaled to observations');
   await expect(page.locator('#forecastNote a')).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.Chart.getChart(document.getElementById('forecastChart'))?.data.labels.length)).toBe(5);
   const lines = await page.evaluate(() => Object.fromEntries(window.Chart.getChart(document.getElementById('forecastChart')).data.datasets
@@ -44,6 +44,25 @@ test('shows the last observed days and the GloFAS forecast when a bundle exists'
   expect(lines['Observed stage (ANA telemetry)']).toEqual({ values: 3, axis: 'yStage' });
   expect(lines['Forecast stage (rating curve)'].axis).toBe('yStage');
   expect(lines[FLOOD_LABEL]).toEqual({ values: 5, axis: 'yStage' });
+});
+
+test('draws the scaled forecast with raw GloFAS as a reference and says how it was scaled', async ({ page }) => {
+  const scaled = structuredClone(forecast);
+  scaled.glofas.scaled = {
+    factor: 0.8, n_days: 7, window: ['2026-10-03', '2026-10-09'], status: 'applied', discharge_m3s: [120, 320, 240],
+  };
+  await page.route('**/forecast/stations/83250000.json', (route) => route.fulfill({ json: scaled }));
+  await page.goto('/?date=2020-01-01&lang=en&station=83250000');
+  const card = page.locator('#forecastCard');
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.scrollIntoViewIfNeeded();
+  await expect(page.locator('#forecastSubtitle')).toContainText('GloFAS × 0.80 (median of 7 days');
+  await expect.poll(() => page.evaluate(() => window.Chart.getChart(document.getElementById('forecastChart'))?.data.datasets.map((dataset) => dataset.label))).toEqual(expect.arrayContaining([
+    'Scaled forecast (GloFAS × 0.80)', 'Raw GloFAS', 'GloFAS 2-year × k',
+  ]));
+  const levels = await page.evaluate(() => window.Chart.getChart(document.getElementById('forecastChart')).data.datasets
+    .find((dataset) => dataset.label === 'GloFAS 2-year × k').data.filter((value) => value != null));
+  expect(levels).toEqual([200, 200, 200]);
 });
 
 test('hides the forecast card when no bundle exists', async ({ page }) => {
