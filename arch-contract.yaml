@@ -7,11 +7,15 @@ layers:
     match: [app.js]
   - name: observability
     match: [observability.js]
+  - name: office
+    match: [office-charts.js]
 
 ruleset:
   application:
-    mayDependOn: [observability]
+    mayDependOn: [observability, office]
   observability:
+    mayDependOn: []
+  office:
     mayDependOn: []
 
 expectations:
