@@ -4,8 +4,13 @@ import {
   quantileFromSorted,
   ratingDischarge,
   ratingStageFromDischarge,
+  REPORT_MIN_CHART_FONT_PT,
+  REPORT_PAGE,
+  reportFigureLayout,
+  reportTextWidthPt,
+  scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=2';
+} from './core.js?v=3';
 
 const STATUS_MAP = {
   n: 'normal',
@@ -277,6 +282,8 @@ const TEXT = {
       methodSection: 'Como interpretar esta estação',
       methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. A evidência hidráulica observada define o limiar principal quando disponível. Nas demais estações, o Q2 estatístico define o limiar. O sistema apresenta registros históricos e não opera alertas em tempo real.',
       statusSection: 'Situação na data selecionada',
+      chartsGroup: 'Gráficos da estação',
+      page: { label: 'Página', of: 'de' },
       chartSection: 'Série temporal principal',
       chartCaption: 'Registro diário observado com a data selecionada e os limiares aplicados.',
       crossSectionSection: 'Evolução das seções transversais',
@@ -584,6 +591,8 @@ const TEXT = {
       methodSection: 'How to interpret this station',
       methodText: 'LIMIAR compares each observed daily value with the thresholds valid for that period. Observed hydraulic evidence defines the primary threshold when available. At the remaining stations, statistical Q2 defines the threshold. The system presents historical records and does not issue real-time warnings.',
       statusSection: 'Selected-day conditions',
+      chartsGroup: 'Station charts',
+      page: { label: 'Page', of: 'of' },
       chartSection: 'Primary time series',
       chartCaption: 'Observed daily record with the selected day and the thresholds applied to that period.',
       crossSectionSection: 'Cross-section evolution',
@@ -1223,24 +1232,26 @@ const thresholdLabelsPlugin = {
       .sort((left, right) => left.y - right.y);
     if (!labels.length) return;
 
-    const minimumGap = 18;
+    const fontSize = Number(options.fontSize) || 10;
+    const halfHeight = fontSize * 0.8;
+    const minimumGap = fontSize + 8;
     labels.forEach((label, index) => {
       if (index && label.y - labels[index - 1].y < minimumGap) {
         label.y = labels[index - 1].y + minimumGap;
       }
-      label.y = Math.min(chart.chartArea.bottom - 8, Math.max(chart.chartArea.top + 8, label.y));
+      label.y = Math.min(chart.chartArea.bottom - halfHeight, Math.max(chart.chartArea.top + halfHeight, label.y));
     });
 
     const { ctx, chartArea } = chart;
     ctx.save();
-    ctx.font = '600 10px "Source Sans 3", sans-serif';
+    ctx.font = `600 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     labels.forEach((label) => {
       const width = ctx.measureText(label.text).width + 12;
       const x = chartArea.right - 4;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
-      ctx.fillRect(x - width, label.y - 8, width, 16);
+      ctx.fillRect(x - width, label.y - halfHeight, width, halfHeight * 2);
       ctx.fillStyle = label.color;
       ctx.fillText(label.text, x - 6, label.y);
     });
@@ -2102,38 +2113,58 @@ function evidenceSummaryText(stationData, context) {
     : `${context.intervalCount} threshold intervals were identified across the record. Bars show observed annual maxima, and markers highlight years with cross-section updates. ${q2Phrase}`;
 }
 
-async function renderChartConfigToBytes(config, width, height) {
+const REPORT_CHART_FONT_FAMILY = 'Helvetica, "Helvetica Neue", Arial, sans-serif';
+
+function reportChartFont(font, bold = false) {
+  return {
+    ...(font || {}),
+    family: REPORT_CHART_FONT_FAMILY,
+    size: REPORT_MIN_CHART_FONT_PT,
+    weight: bold ? '700' : '300',
+  };
+}
+
+function applyReportChartTypography(options, sourceOptions) {
+  options.font = reportChartFont(options.font);
+  const plugins = options.plugins || {};
+  options.plugins = plugins;
+  if (plugins.legend?.labels) {
+    Object.assign(plugins.legend.labels, {
+      font: reportChartFont(plugins.legend.labels.font),
+      boxWidth: 12,
+      boxHeight: 12,
+      pointStyleWidth: 16,
+      padding: 14,
+    });
+    // JSON cloning drops functions, so the on-screen legend filter is restored here.
+    const legendFilter = sourceOptions?.plugins?.legend?.labels?.filter;
+    if (legendFilter) plugins.legend.labels.filter = legendFilter;
+  }
+  if (plugins.thresholdLabels) {
+    plugins.thresholdLabels.fontSize = REPORT_MIN_CHART_FONT_PT;
+    plugins.thresholdLabels.fontFamily = REPORT_CHART_FONT_FAMILY;
+  }
+  Object.values(options.scales || {}).forEach((scale) => {
+    if (scale?.ticks) {
+      Object.assign(scale.ticks, { font: reportChartFont(scale.ticks.font), maxRotation: 0, autoSkipPadding: 12 });
+    }
+    if (scale?.title?.display) scale.title.font = reportChartFont(scale.title.font, true);
+  });
+}
+
+async function renderChartConfigToBytes(config, layout) {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = layout.canvasWidth;
+  canvas.height = layout.canvasHeight;
   const exportConfig = JSON.parse(JSON.stringify(config));
   exportConfig.options = {
     ...(exportConfig.options || {}),
     animation: false,
     responsive: false,
     maintainAspectRatio: false,
+    devicePixelRatio: layout.pixelRatio,
   };
-  if (exportConfig.options?.plugins?.legend?.labels) {
-    exportConfig.options.plugins.legend.labels.font = {
-      ...(exportConfig.options.plugins.legend.labels.font || {}),
-      size: 24,
-    };
-  }
-  Object.values(exportConfig.options?.scales || {}).forEach((scale) => {
-    if (scale?.ticks) {
-      scale.ticks.font = {
-        ...(scale.ticks.font || {}),
-        size: 24,
-      };
-    }
-    if (scale?.title?.display) {
-      scale.title.font = {
-        ...(scale.title.font || {}),
-        size: 26,
-        weight: '600',
-      };
-    }
-  });
+  applyReportChartTypography(exportConfig.options, config.options);
   const chart = new Chart(canvas.getContext('2d'), exportConfig);
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   const bytes = await dataUrlToUint8Array(canvas.toDataURL('image/png', 1));
@@ -2141,15 +2172,15 @@ async function renderChartConfigToBytes(config, width, height) {
   return bytes;
 }
 
-async function chartToBytes(chartKey, width, height) {
+async function chartToBytes(chartKey, layout) {
   const chart = state.charts[chartKey];
   if (!chart) return null;
-  return renderChartConfigToBytes(chart.config._config, width, height);
+  return renderChartConfigToBytes(chart.config._config, layout);
 }
 
-async function safeChartToBytes(chartKey, width, height) {
+async function safeChartToBytes(chartKey, layout) {
   try {
-    return await chartToBytes(chartKey, width, height);
+    return await chartToBytes(chartKey, layout);
   } catch (error) {
     console.warn(`Could not export chart ${chartKey} to image.`, error);
     return null;
@@ -4715,6 +4746,8 @@ async function buildQaPanelPartImages(src) {
   return Promise.all(QA_PANEL_PARTS.map(async (panel) => ({
     ...panel,
     title: qaPanelPartLabel(panel.key),
+    naturalWidth: halfWidth,
+    naturalHeight: halfHeight,
     bytes: await cropImageRectToBytes(
       image,
       panel.col * halfWidth,
@@ -4734,6 +4767,30 @@ const REPORT_THEME = {
   border: 'D2C4AF',
 };
 
+const REPORT_FONT = { body: 'Helvetica Light', bold: 'Helvetica' };
+
+// Word sizes are in half-points.
+const REPORT_SIZE = {
+  title: 44,
+  subtitle: 28,
+  heading: 32,
+  subheading: 26,
+  body: 22,
+  table: 20,
+  caption: 20,
+  running: 18,
+};
+
+const REPORT_FIGURE_WIDTH_PT = Math.min(450, reportTextWidthPt());
+const REPORT_FIGURES = {
+  timeseriesChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  crossSectionChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 330),
+  dynamicDailyChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  ratingCurveChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 340),
+  evidenceChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  seasonalityChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 260),
+};
+
 function reportRun(text, options = {}) {
   const docx = window.docx;
   return new docx.TextRun({
@@ -4741,8 +4798,8 @@ function reportRun(text, options = {}) {
     bold: Boolean(options.bold),
     italics: Boolean(options.italics),
     color: options.color || REPORT_THEME.text,
-    size: options.size || 26,
-    font: options.font || 'Aptos',
+    size: options.size || REPORT_SIZE.body,
+    font: options.bold ? REPORT_FONT.bold : REPORT_FONT.body,
   });
 }
 
@@ -4750,11 +4807,14 @@ function reportParagraph(text, options = {}) {
   const docx = window.docx;
   return new docx.Paragraph({
     alignment: options.alignment,
-    pageBreakBefore: options.pageBreakBefore,
+    heading: options.heading,
+    keepNext: options.keepNext,
+    tabStops: options.tabStops,
+    border: options.border,
     spacing: {
       before: options.before || 0,
-      after: options.after ?? 140,
-      line: options.line || 340,
+      after: options.after ?? 120,
+      line: options.line || 276,
     },
     children: Array.isArray(options.children) && options.children.length
       ? options.children
@@ -4766,22 +4826,92 @@ function reportCell(text, options = {}) {
   const docx = window.docx;
   return new docx.TableCell({
     shading: options.fill ? { fill: options.fill } : undefined,
+    width: options.width ? { size: options.width, type: docx.WidthType.DXA } : undefined,
     margins: {
-      top: 90,
-      bottom: 90,
+      top: 80,
+      bottom: 80,
       left: 110,
       right: 110,
     },
     children: [
       reportParagraph(text, {
-        size: options.size || 26,
+        size: options.size || REPORT_SIZE.table,
         bold: options.bold,
         color: options.color || REPORT_THEME.text,
         after: 0,
-        line: 300,
+        line: 260,
       }),
     ],
   });
+}
+
+function reportTable(rows, columnWidths) {
+  const docx = window.docx;
+  return new docx.Table({
+    width: { size: columnWidths.reduce((sum, value) => sum + value, 0), type: docx.WidthType.DXA },
+    columnWidths,
+    layout: docx.TableLayoutType.FIXED,
+    rows,
+  });
+}
+
+function reportRunningParagraph(left, right, borderSide) {
+  const docx = window.docx;
+  const size = REPORT_SIZE.running;
+  return reportParagraph('', {
+    after: 0,
+    line: 240,
+    tabStops: [{ type: docx.TabStopType.RIGHT, position: REPORT_PAGE.width - 2 * REPORT_PAGE.margin }],
+    border: {
+      [borderSide]: { style: docx.BorderStyle.SINGLE, size: 4, color: REPORT_THEME.border, space: 4 },
+    },
+    children: [
+      reportRun(left, { size, color: REPORT_THEME.muted }),
+      new docx.TextRun({ children: [new docx.Tab()] }),
+      ...right,
+    ],
+  });
+}
+
+function reportSection(sectionTitle, footerText, children) {
+  const docx = window.docx;
+  const pageText = TEXT[state.lang].report.page;
+  const pageRun = new docx.TextRun({
+    size: REPORT_SIZE.running,
+    color: REPORT_THEME.muted,
+    font: REPORT_FONT.body,
+    children: [`${pageText.label} `, docx.PageNumber.CURRENT, ` ${pageText.of} `, docx.PageNumber.TOTAL_PAGES],
+  });
+  return {
+    properties: {
+      page: {
+        size: { width: REPORT_PAGE.width, height: REPORT_PAGE.height },
+        margin: {
+          top: REPORT_PAGE.margin,
+          right: REPORT_PAGE.margin,
+          bottom: REPORT_PAGE.margin,
+          left: REPORT_PAGE.margin,
+          header: REPORT_PAGE.headerFooter,
+          footer: REPORT_PAGE.headerFooter,
+        },
+      },
+    },
+    headers: {
+      default: new docx.Header({
+        children: [
+          reportRunningParagraph(`LIMIAR · ${TEXT[state.lang].report.title}`, [
+            reportRun(sectionTitle, { size: REPORT_SIZE.running, bold: true, color: REPORT_THEME.accent }),
+          ], 'bottom'),
+        ],
+      }),
+    },
+    footers: {
+      default: new docx.Footer({
+        children: [reportRunningParagraph(footerText, [pageRun], 'top')],
+      }),
+    },
+    children,
+  };
 }
 
 async function exportStationReport() {
@@ -4799,18 +4929,17 @@ async function exportStationReport() {
       renderTimeseriesChart(state.selectedData);
     }
     renderStationCharts(state.selectedData, true);
-    const chartBytes = await safeChartToBytes('timeseriesChart', 2800, 1500);
-    const crossSectionBytes = await safeChartToBytes('crossSectionChart', 2600, 1500);
-    const dynamicDailyBytes = await safeChartToBytes('dynamicDailyChart', 2800, 1500);
-    const ratingCurveBytes = await safeChartToBytes('ratingCurveChart', 2600, 1500);
-    const evidenceBytes = await safeChartToBytes('evidenceChart', 2700, 1460);
-    const seasonalityBytes = await safeChartToBytes('seasonalityChart', 2600, 1300);
+    const figureBytes = {};
+    for (const [chartKey, layout] of Object.entries(REPORT_FIGURES)) {
+      figureBytes[chartKey] = await safeChartToBytes(chartKey, layout);
+    }
     const qaPanelParts = await safeBuildQaPanelPartImages(state.selectedData.qa.panel_png);
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
     const latestCurve = latestRatingCurve(state.selectedData);
     const docEvents = normalizedEventRows(state.selectedData);
     const qaFlagsText = (state.selectedData.qa.flags || []).length ? state.selectedData.qa.flags.map(flagLabel).join('; ') : text('noQaFlags');
+    const report = TEXT[state.lang].report;
     const summaryPairs = [
       [text('fields').selectedDate, formatDate(state.selectedDate)],
       [text('selectedMetricStatusLabel'), statusLabel(details.status)],
@@ -4828,224 +4957,180 @@ async function exportStationReport() {
       [text('fields').maxDuration, formatDuration(state.selectedData.summary.max_event_duration_days)],
     ];
 
+    const textWidth = REPORT_PAGE.width - 2 * REPORT_PAGE.margin;
+    const summaryColumns = [2513, 2000, 2513, 2000];
+    const eventColumns = [1700, 1700, 1600, 1900, 2126];
     const summaryRows = [];
     for (let index = 0; index < summaryPairs.length; index += 2) {
       const left = summaryPairs[index];
       const right = summaryPairs[index + 1];
       summaryRows.push(new docx.TableRow({
         children: [
-          reportCell(left?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
-          reportCell(left?.[1] || ''),
-          reportCell(right?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
-          reportCell(right?.[1] || ''),
+          reportCell(left?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: summaryColumns[0] }),
+          reportCell(left?.[1] || '', { width: summaryColumns[1] }),
+          reportCell(right?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: summaryColumns[2] }),
+          reportCell(right?.[1] || '', { width: summaryColumns[3] }),
         ],
       }));
     }
-    const summaryTable = new docx.Table({ rows: summaryRows });
+    const summaryTable = reportTable(summaryRows, summaryColumns);
 
     const eventsTableRows = [
       new docx.TableRow({
-        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell) => reportCell(cell, {
+        tableHeader: true,
+        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell, index) => reportCell(cell, {
           fill: REPORT_THEME.softAccent,
           bold: true,
           color: REPORT_THEME.accent,
+          width: eventColumns[index],
         })),
       }),
       ...(docEvents.length
         ? docEvents.map((event) => new docx.TableRow({
           children: [
-            reportCell(formatShortDate(event.event_start)),
-            reportCell(formatShortDate(event.peak_date)),
-            reportCell(formatDuration(event.duration_days)),
-            reportCell(
-              event.peak_stage_cm != null
-                ? formatValue(event.peak_stage_cm, 'stage_cm')
-                : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
-            ),
-            reportCell(event.display_class),
-          ],
+            formatShortDate(event.event_start),
+            formatShortDate(event.peak_date),
+            formatDuration(event.duration_days),
+            event.peak_stage_cm != null
+              ? formatValue(event.peak_stage_cm, 'stage_cm')
+              : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
+            event.display_class,
+          ].map((cell, index) => reportCell(cell, { width: eventColumns[index] })),
         }))
         : [new docx.TableRow({
-          children: Array.from({ length: 5 }, (_, index) => reportCell(index === 0 ? '-' : '')),
+          children: eventColumns.map((width, index) => reportCell(index === 0 ? '-' : '', { width })),
         })]),
     ];
 
-    const figureParagraph = (bytes, width, height) => new docx.Paragraph({
+    const heading = (value) => reportParagraph(value, {
+      size: REPORT_SIZE.heading,
+      bold: true,
+      color: REPORT_THEME.accent,
+      heading: docx.HeadingLevel.HEADING_1,
+      keepNext: true,
+      after: 160,
+    });
+
+    const subheading = (value) => reportParagraph(value, {
+      size: REPORT_SIZE.subheading,
+      bold: true,
+      color: REPORT_THEME.accent,
+      heading: docx.HeadingLevel.HEADING_2,
+      keepNext: true,
+      before: 200,
+      after: 80,
+    });
+
+    const figureParagraph = (bytes, size, altText) => new docx.Paragraph({
       alignment: docx.AlignmentType.CENTER,
-      spacing: { after: 120 },
+      keepNext: true,
+      spacing: { before: 60, after: 80 },
       children: [
         new docx.ImageRun({
           data: bytes,
-          transformation: { width, height },
+          transformation: { width: size.imageWidth, height: size.imageHeight },
+          altText: { name: altText, title: altText, description: altText },
         }),
       ],
     });
 
     const figureCaption = (captionText) => reportParagraph(captionText, {
-      size: 26,
+      size: REPORT_SIZE.caption,
       italics: true,
       color: REPORT_THEME.muted,
-      after: 220,
+      after: 200,
     });
 
+    const chartFigure = (chartKey, title, caption) => (figureBytes[chartKey] ? [
+      subheading(title),
+      figureParagraph(figureBytes[chartKey], REPORT_FIGURES[chartKey], title),
+      figureCaption(caption),
+    ] : []);
+
     const timeseriesCaption = latestCurve && state.selectedData.summary.threshold_value_type === 'stage_cm'
-      ? `${TEXT[state.lang].report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
-      : TEXT[state.lang].report.chartCaption;
+      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
+      : report.chartCaption;
+
+    const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;
+    const footerText = `${state.selectedData.metadata.station_name} (${state.selectedData.metadata.station_code}) · ${formatDate(state.selectedDate)}`;
 
     const doc = new docx.Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              margin: { top: 720, right: 720, bottom: 720, left: 720 },
-            },
+      styles: {
+        default: {
+          document: {
+            run: { font: REPORT_FONT.body, size: REPORT_SIZE.body, color: REPORT_THEME.text },
           },
-          children: [
-            reportParagraph(TEXT[state.lang].report.title, {
-              size: 40,
-              bold: true,
-              color: REPORT_THEME.accent,
-              after: 80,
-            }),
-            reportParagraph(`${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`, {
-              size: 30,
-              bold: true,
-              after: 50,
-            }),
-            reportParagraph(`${formatDate(state.selectedDate)} · ${statusLabel(details.status)} · ${basisLabel(basisKey)}`, {
-              size: 24,
-              color: REPORT_THEME.muted,
-              after: 220,
-            }),
-            reportParagraph(TEXT[state.lang].report.summarySection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              after: 100,
-            }),
-            summaryTable,
-            reportParagraph(TEXT[state.lang].report.methodSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              before: 180,
-              after: 80,
-            }),
-            new docx.Table({
-              rows: [
-                new docx.TableRow({
-                  children: [
-                    reportCell(TEXT[state.lang].report.methodText, {
-                      fill: REPORT_THEME.soft,
-                      size: 26,
-                    }),
-                  ],
+        },
+      },
+      sections: [
+        reportSection(report.summarySection, footerText, [
+          reportParagraph(report.title, {
+            size: REPORT_SIZE.title,
+            bold: true,
+            color: REPORT_THEME.accent,
+            heading: docx.HeadingLevel.TITLE,
+            after: 80,
+          }),
+          reportParagraph(`${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`, {
+            size: REPORT_SIZE.subtitle,
+            bold: true,
+            after: 40,
+          }),
+          reportParagraph(`${formatDate(state.selectedDate)} · ${statusLabel(details.status)} · ${basisLabel(basisKey)}`, {
+            color: REPORT_THEME.muted,
+            after: 280,
+          }),
+          heading(report.summarySection),
+          summaryTable,
+          subheading(report.methodSection),
+          reportTable([
+            new docx.TableRow({
+              children: [
+                reportCell(report.methodText, {
+                  fill: REPORT_THEME.soft,
+                  size: REPORT_SIZE.body,
+                  width: textWidth,
                 }),
               ],
             }),
-            reportParagraph(TEXT[state.lang].report.chartSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 90,
-            }),
-            ...(chartBytes ? [
-              figureParagraph(chartBytes, 660, 354),
-              figureCaption(timeseriesCaption),
-            ] : []),
-            ...(crossSectionBytes ? [
-              reportParagraph(TEXT[state.lang].report.crossSectionSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(crossSectionBytes, 660, 381),
-              figureCaption(TEXT[state.lang].report.crossSectionCaption),
-            ] : []),
-            ...(dynamicDailyBytes ? [
-              reportParagraph(TEXT[state.lang].report.dynamicDailySection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(dynamicDailyBytes, 660, 354),
-              figureCaption(TEXT[state.lang].report.dynamicDailyCaption),
-            ] : []),
-            ...(ratingCurveBytes ? [
-              reportParagraph(TEXT[state.lang].report.ratingCurveSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(ratingCurveBytes, 660, 381),
-              figureCaption(TEXT[state.lang].report.ratingCurveCaption),
-            ] : []),
-            ...(evidenceBytes ? [
-              reportParagraph(TEXT[state.lang].report.evidenceSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(evidenceBytes, 660, 357),
-              figureCaption(TEXT[state.lang].report.evidenceCaption),
-            ] : []),
-            ...(seasonalityBytes ? [
-              reportParagraph(TEXT[state.lang].report.seasonalitySection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(seasonalityBytes, 660, 330),
-              figureCaption(TEXT[state.lang].report.seasonalityCaption),
-            ] : []),
-            reportParagraph(TEXT[state.lang].report.qaSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 80,
-            }),
-            reportParagraph(qaFlagsText, {
-              size: 24,
-              color: REPORT_THEME.muted,
-              after: 120,
-            }),
-            ...(qaPanelParts.length ? [
-              figureCaption(TEXT[state.lang].report.qaCaption),
-              reportParagraph(TEXT[state.lang].report.qaSubpanelsSection, {
-                size: 26,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              ...qaPanelParts.flatMap((panel) => [
+          ], [textWidth]),
+        ]),
+        reportSection(report.chartsGroup, footerText, [
+          heading(report.chartsGroup),
+          ...chartFigure('timeseriesChart', report.chartSection, timeseriesCaption),
+          ...chartFigure('crossSectionChart', report.crossSectionSection, report.crossSectionCaption),
+          ...chartFigure('dynamicDailyChart', report.dynamicDailySection, report.dynamicDailyCaption),
+          ...chartFigure('ratingCurveChart', report.ratingCurveSection, report.ratingCurveCaption),
+          ...chartFigure('evidenceChart', report.evidenceSection, report.evidenceCaption),
+          ...chartFigure('seasonalityChart', report.seasonalitySection, report.seasonalityCaption),
+        ]),
+        reportSection(report.qaSection, footerText, [
+          heading(report.qaSection),
+          reportParagraph(qaFlagsText, {
+            color: REPORT_THEME.muted,
+            after: 120,
+          }),
+          ...(qaPanelParts.length ? [
+            figureCaption(report.qaCaption),
+            subheading(report.qaSubpanelsSection),
+            ...qaPanelParts.flatMap((panel) => {
+              const size = scaleToWidth(panel.naturalWidth, panel.naturalHeight, qaImageWidth);
+              return [
                 reportParagraph(panel.title, {
-                  size: 26,
                   bold: true,
-                  color: REPORT_THEME.text,
+                  keepNext: true,
+                  before: 120,
                   after: 60,
                 }),
-                figureParagraph(panel.bytes, 640, 422),
-              ]),
-            ] : []),
-            reportParagraph(TEXT[state.lang].report.eventsSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 80,
+                figureParagraph(panel.bytes, { imageWidth: size.width, imageHeight: size.height }, panel.title),
+              ];
             }),
-            new docx.Table({
-              rows: eventsTableRows,
-            }),
-          ],
-        },
+          ] : []),
+        ]),
+        reportSection(report.eventsSection, footerText, [
+          heading(report.eventsSection),
+          reportTable(eventsTableRows, eventColumns),
+        ]),
       ],
     });
     const blob = await docx.Packer.toBlob(doc);
