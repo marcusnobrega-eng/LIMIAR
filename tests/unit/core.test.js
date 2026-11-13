@@ -145,3 +145,208 @@ describe('timeline', () => {
     expect(core.addMonths('2020-03-10', -27)).toBe('2017-12-10');
   });
 });
+
+describe('station report layout', () => {
+  it('uses A4 pages with 2.54 cm margins', () => {
+    expect(core.REPORT_PAGE).toEqual({ width: 11906, height: 16838, margin: 1440, headerFooter: 720 });
+    expect(core.reportTextWidthPt()).toBeCloseTo(451.3, 6);
+    expect(core.reportTextWidthPt({ width: 12240, margin: 1080 })).toBe(504);
+  });
+
+  it('draws charts at one canvas unit per printed point', () => {
+    const layout = core.reportFigureLayout(450, 300);
+    expect(layout).toEqual({ canvasWidth: 450, canvasHeight: 300, pixelRatio: 4, imageWidth: 600, imageHeight: 400 });
+    expect((layout.imageWidth * 72) / 96).toBe(layout.canvasWidth);
+    expect(core.reportFigureLayout(300, 145, 2)).toEqual({ canvasWidth: 300, canvasHeight: 145, pixelRatio: 2, imageWidth: 400, imageHeight: 193 });
+  });
+
+  it('keeps chart text at or above 16 pt', () => {
+    expect(core.REPORT_MIN_CHART_FONT_PT).toBe(16);
+  });
+
+  it('scales images to a target width without changing their shape', () => {
+    expect(core.scaleToWidth(1200, 800, 600)).toEqual({ width: 600, height: 400 });
+    expect(core.scaleToWidth(1000, 333, 600)).toEqual({ width: 600, height: 200 });
+  });
+});
+
+describe('discharge from the rating curve for each day', () => {
+  // Segments from ANA station 13880000 (Canutama) as exported to the website.
+  const curves = [
+    { validFrom: '1997-01-01', validTo: '2016-01-08', stageMin: 1505, stageMax: 2550, coefficientA: 72.0109, coefficientH0: 4.58, coefficientN: 1.7, segmentId: '1997-b' },
+    { validFrom: '2016-01-09', validTo: '2023-12-31', stageMin: 700, stageMax: 2289, coefficientA: 9.9319, coefficientH0: 0.21, coefficientN: 2.2, segmentId: '2016-a' },
+    { validFrom: '2016-01-09', validTo: '2023-12-31', stageMin: 2289, stageMax: 2550, coefficientA: 93.1542, coefficientH0: 8.14, coefficientN: 1.72, segmentId: '2016-b' },
+    { validFrom: '2024-01-01', validTo: '2025-12-31', stageMin: 2290, stageMax: 2600, coefficientA: 42.8607, coefficientH0: 9.18, coefficientN: 2.057, segmentId: '2024-b' },
+  ];
+  const pick = (date, stage) => core.ratingSegmentForDate(curves, date, stage);
+
+  it('uses the segment valid on the date that contains the stage', () => {
+    expect(pick('2018-03-01', 1200)).toEqual({ segment: curves[1], validOnDate: true });
+    expect(pick('2018-03-01', 2400).segment.segmentId).toBe('2016-b');
+    expect(pick('2024-06-01', 2400).segment.segmentId).toBe('2024-b');
+    expect(core.validCurveDischarge(curves, '2018-03-01', 1200).discharge).toBeCloseTo(9.9319 * (12 - 0.21) ** 2.2, 6);
+  });
+
+  it('falls back to the most recent segment containing the stage when none is valid on the date', () => {
+    expect(pick('1976-02-27', 2353)).toEqual({ segment: curves[3], validOnDate: false });
+    expect(pick('1976-02-27', 1200)).toEqual({ segment: curves[1], validOnDate: false });
+    expect(pick('2024-06-01', 1200)).toEqual({ segment: curves[1], validOnDate: false });
+    expect(core.validCurveDischarge(curves, '1976-02-27', 2353).validOnDate).toBe(false);
+  });
+
+  it('returns nothing when no segment contains the stage', () => {
+    expect(pick('2018-03-01', 500)).toBeNull();
+    expect(pick('2018-03-01', 2700)).toBeNull();
+    expect(core.validCurveDischarge(curves, '2018-03-01', 500)).toEqual({ discharge: null, segment: null, validOnDate: null });
+  });
+
+  it('prefers the most recent start when curves overlap', () => {
+    const overlapping = [
+      { validFrom: '2000-01-01', validTo: '2010-12-31', stageMin: 0, stageMax: 500, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'older' },
+      { validFrom: '2005-01-01', validTo: '2010-12-31', stageMin: 0, stageMax: 500, coefficientA: 2, coefficientH0: 0, coefficientN: 2, segmentId: 'newer' },
+    ];
+    expect(core.ratingSegmentForDate(overlapping, '2006-01-01', 100).segment.segmentId).toBe('newer');
+    expect(core.ratingSegmentForDate(overlapping, '2003-01-01', 100).segment.segmentId).toBe('older');
+    expect(core.ratingSegmentForDate(overlapping, '2020-01-01', 100)).toEqual({ segment: overlapping[1], validOnDate: false });
+  });
+
+  it('ignores segments without stage bounds and missing inputs', () => {
+    const open = [{ validFrom: null, validTo: null, stageMin: 0, stageMax: 500, coefficientA: 1, coefficientH0: 0, coefficientN: 2, segmentId: 'open' }];
+    expect(core.ratingSegmentForDate(open, '1950-01-01', 100)).toEqual({ segment: open[0], validOnDate: true });
+    expect(core.ratingSegmentForDate([{ ...open[0], stageMin: null }], '1950-01-01', 100)).toBeNull();
+    expect(core.ratingSegmentForDate(open, '1950-01-01', null)).toBeNull();
+    expect(core.ratingSegmentForDate(open, '', 100)).toBeNull();
+    expect(core.ratingSegmentForDate(undefined, '1950-01-01', 100)).toBeNull();
+    expect(core.validCurveDischarge([{ ...open[0], coefficientH0: 2 }], '1950-01-01', 100)).toEqual({ discharge: null, segment: null, validOnDate: null });
+  });
+});
+
+describe('cross-section profiles', () => {
+  const profile = (pairs) => pairs.map(([x, y]) => ({ x, y }));
+
+  it('takes the lower bank as bankfull stage and measures depth from the thalweg', () => {
+    const result = core.bankfullFromProfile(profile([[0, 900], [10, 700], [20, 300], [30, 650], [40, 820], [50, 760]]));
+    expect(result).toEqual({ thalweg: 300, leftBank: 900, rightBank: 820, bankfull: 820, depth: 520 });
+  });
+
+  it('collapses repeated distances to the median elevation and sorts by distance', () => {
+    const result = core.bankfullFromProfile(profile([[40, 800], [0, 900], [20, 100], [20, 300], [20, 500], [10, 700], [30, 650]]));
+    expect(result.thalweg).toBe(300);
+    expect(result.bankfull).toBe(800);
+  });
+
+  it('uses the first of equally low vertices as the thalweg', () => {
+    const result = core.bankfullFromProfile(profile([[0, 900], [10, 800], [20, 300], [30, 300], [40, 700], [50, 750]]));
+    expect(result).toMatchObject({ leftBank: 900, rightBank: 750, bankfull: 750 });
+  });
+
+  it('rejects profiles that S3 rejects', () => {
+    expect(core.bankfullFromProfile(profile([[0, 900], [10, 300], [20, 800], [30, 850]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 300], [10, 900], [20, 800], [30, 850], [40, 870]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 900], [10, 800], [20, 700], [30, 300], [40, 850]]))).toBeNull();
+    expect(core.bankfullFromProfile(profile([[0, 500], [10, 500], [20, 500], [30, 500], [40, 500]]))).toBeNull();
+    expect(core.bankfullFromProfile([{ x: 0, y: 1 }, { x: null, y: 2 }, { x: 'a', y: 3 }, { x: 1, y: undefined }, null])).toBeNull();
+    expect(core.bankfullFromProfile(undefined)).toBeNull();
+  });
+});
+
+describe('rating-curve segments', () => {
+  it('reads the consistency level and segment number from the identifier', () => {
+    expect(core.parseRatingSegmentId('13880000__20160109000000__20231231000000__2__01_02__700__2289__1__1__NA__9_9319__0_21__2_2'))
+      .toEqual({ consistencyLevel: 2, segment: 1, segments: 2 });
+    expect(core.parseRatingSegmentId('x__y__z__1__03_11')).toEqual({ consistencyLevel: 1, segment: 3, segments: 11 });
+    expect(core.parseRatingSegmentId(null)).toEqual({ consistencyLevel: null, segment: null, segments: null });
+    expect(core.parseRatingSegmentId('a__b__c____bad')).toEqual({ consistencyLevel: null, segment: null, segments: null });
+  });
+
+  it('writes the equation with the sign of h0', () => {
+    expect(core.ratingEquationParts(9.9319, 0.21, 2.2)).toEqual({ base: 'Q = 9.9319 (H − 0.21)', exponent: '2.2' });
+    expect(core.ratingEquationParts(3.0152, -2.04, 2.5)).toEqual({ base: 'Q = 3.0152 (H + 2.04)', exponent: '2.5' });
+    expect(core.ratingEquationParts(1, 0, 2, (value) => value.toFixed(1)).base).toBe('Q = 1.0 (H − 0.0)');
+  });
+});
+
+describe('file names', () => {
+  it('turns station names into plain file-name parts', () => {
+    expect(core.fileNamePart('ITUPORANGA')).toBe('ITUPORANGA');
+    expect(core.fileNamePart('São José dos Campos (montante)')).toBe('Sao_Jose_dos_Campos_montante');
+    expect(core.fileNamePart('  ÁGUA / ÇÃO  ')).toBe('AGUA_CAO');
+    expect(core.fileNamePart('A'.repeat(70))).toHaveLength(60);
+    expect(core.fileNamePart(`${'B'.repeat(59)} C`)).toBe('B'.repeat(59));
+    expect(core.fileNamePart(null)).toBe('');
+  });
+});
+
+
+describe('provisional (raw ANA) days', () => {
+  const ranges = [[3, 5], [10, 10], [20, 30]];
+
+  it('finds offsets inside, at the edges of, and outside the ranges', () => {
+    expect([2, 3, 4, 5, 6].map((offset) => core.isProvisionalOffset(ranges, offset))).toEqual([false, true, true, true, false]);
+    expect([9, 10, 11, 19, 20, 30, 31].map((offset) => core.isProvisionalOffset(ranges, offset))).toEqual([false, true, false, false, true, true, false]);
+    expect(core.isProvisionalOffset(ranges, 0)).toBe(false);
+    expect(core.isProvisionalOffset([], 4)).toBe(false);
+    expect(core.isProvisionalOffset(undefined, 4)).toBe(false);
+    expect(core.isProvisionalOffset([[4, 4]], 4)).toBe(true);
+  });
+
+  it('groups consecutive provisional entries into index runs', () => {
+    expect(core.provisionalRuns([false, true, true, false, true, false, false, true])).toEqual([[1, 2], [4, 4], [7, 7]]);
+    expect(core.provisionalRuns([true, true, true])).toEqual([[0, 2]]);
+    expect(core.provisionalRuns([false, false])).toEqual([]);
+    expect(core.provisionalRuns([])).toEqual([]);
+  });
+});
+
+describe('forecast timeline', () => {
+  it('spans the observed days and the forecast without gaps', () => {
+    expect(core.continuousDates(['2026-10-08', '2026-10-09'], ['2026-10-11', '2026-10-12'])).toEqual(['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12']);
+    expect(core.continuousDates(['2026-10-10'], ['2026-10-10'])).toEqual(['2026-10-10']);
+    expect(core.continuousDates([], ['2026-12-31', '2027-01-01'])).toEqual(['2026-12-31', '2027-01-01']);
+    expect(core.continuousDates([], [])).toEqual([]);
+  });
+});
+
+describe('stage from discharge through the rating curve', () => {
+  const curve = (validFrom, validTo, stageMin, stageMax, coefficientA, coefficientH0, coefficientN) => ({
+    validFrom, validTo, stageMin, stageMax, coefficientA, coefficientH0, coefficientN,
+  });
+  const old = curve('2000-01-01', '2010-12-31', 0, 1000, 20, 0, 2);
+  const recent = curve('2015-01-01', '2020-12-31', 0, 1000, 10, 0.5, 2);
+
+  it('inverts the discharge of the curve valid on the date', () => {
+    const { discharge } = core.validCurveDischarge([old, recent], '2018-06-01', 300);
+    const result = core.validCurveStage([old, recent], '2018-06-01', discharge);
+    expect(result.stage).toBeCloseTo(300, 8);
+    expect(result.segment).toBe(recent);
+    expect(result.validOnDate).toBe(true);
+  });
+
+  it('uses the most recent curve after every curve has expired', () => {
+    const result = core.validCurveStage([old, recent], '2026-10-20', 40);
+    expect(result.segment).toBe(recent);
+    expect(result.validOnDate).toBe(false);
+    expect(result.stage).toBeCloseTo((0.5 + Math.sqrt(4)) * 100, 8);
+  });
+
+  it('does not extrapolate beyond the segment stage range', () => {
+    expect(core.validCurveStage([curve('2015-01-01', null, 0, 300, 10, 0.5, 2)], '2026-10-20', 1000).stage).toBeNull();
+    expect(core.validCurveStage([recent], '2026-10-20', null).stage).toBeNull();
+    expect(core.validCurveStage([recent], '2026-10-20', 0).stage).toBeNull();
+    expect(core.validCurveStage([], '2026-10-20', 40).stage).toBeNull();
+  });
+});
+
+describe('axis ranges', () => {
+  it('fits the values with a margin and rounds to a readable step', () => {
+    expect(core.niceAxisRange([16200, 19500, 30450])).toEqual({ min: 14000, max: 32000 });
+    expect(core.niceAxisRange([70, 212, 309])).toEqual({ min: 50, max: 350 });
+  });
+
+  it('keeps non-negative data on a non-negative axis and handles flat or empty input', () => {
+    expect(core.niceAxisRange([0.2, 3, 9]).min).toBe(0);
+    expect(core.niceAxisRange([100, 100])).toEqual({ min: 85, max: 115 });
+    expect(core.niceAxisRange([null, Number.NaN])).toBeNull();
+    expect(core.niceAxisRange([])).toBeNull();
+  });
+});

@@ -3,6 +3,7 @@
   "entry": [
     "app.js",
     "core.js",
+    "office-charts.js",
     "observability.js"
   ],
   "ignore": [

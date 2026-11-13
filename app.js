@@ -1,18 +1,34 @@
 import {
   addDays,
+  fileNamePart,
+  bankfullFromProfile,
+  continuousDates,
+  niceAxisRange,
+  validCurveStage,
   normalizeThresholdTriplet,
+  parseRatingSegmentId,
   quantileFromSorted,
   ratingDischarge,
+  ratingEquationParts,
   ratingStageFromDischarge,
-  dateFromDayNumber,
   addMonths,
+  dateFromDayNumber,
   dateInWindow,
   dayNumber,
   monthStarts,
+  validCurveDischarge,
+  REPORT_MIN_CHART_FONT_PT,
+  REPORT_PAGE,
+  reportFigureLayout,
+  reportTextWidthPt,
+  isProvisionalOffset,
+  provisionalRuns,
+  scaleToWidth,
   summarizeDailyStations,
   timelineWindow,
   yearlyStationCoverage,
-} from './core.js?v=3';
+} from './core.js?v=10';
+import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
   n: 'normal',
@@ -77,6 +93,71 @@ const TEXT = {
     timelineNote: 'Faixa sombreada: estações cujo registro abrange cada ano',
     timelineOverviewLabel: 'Escolher o ano no registro completo',
     timelineDetailLabel: 'Escolher o dia na janela de 12 meses',
+    maximizeChart: 'Ampliar gráfico',
+    chartUnavailable: 'Este gráfico ainda não está disponível.',
+    crossSectionTableTitle: 'Levantamentos das seções',
+    crossSectionTableNote: 'Calculado sobre o perfil completo: o talvegue é o ponto mais baixo e a cota de margens plenas é a menor das duas margens.',
+    thSurveyDate: 'Data do levantamento',
+    thThalweg: 'Talvegue (cm)',
+    thLeftBank: 'Margem esquerda (cm)',
+    thRightBank: 'Margem direita (cm)',
+    thBankfull: 'Margens plenas (cm)',
+    thDepth: 'Profundidade até margens plenas (cm)',
+    ratingTableTitle: 'Curvas-chave',
+    ratingTableNote: 'Um trecho por linha. H é a cota em metros e Q a vazão em m³/s.',
+    thValidFrom: 'Válida de',
+    thValidTo: 'Válida até',
+    thSegment: 'Trecho',
+    thConsistency: 'Consistência',
+    thStageRange: 'Faixa de cota (cm)',
+    thEquation: 'Equação',
+    exportCrossSectionTableCsvButton: 'Baixar tabela',
+    exportRatingTableCsvButton: 'Baixar tabela',
+    consistencyRaw: 'Bruta (1)',
+    consistencyChecked: 'Consistida (2)',
+    dataVersion: 'Versão dos dados',
+    forecast: {
+      title: 'Últimos 30 dias e previsão (experimental)',
+      titleDischarge: 'Vazão: últimos 30 dias e previsão (experimental)',
+      titleStage: 'Cota: últimos 30 dias e previsão (experimental)',
+      stageFromScaled: 'cota prevista = previsão ajustada convertida pela curva-chave da estação',
+      stageFromRaw: 'cota prevista = GloFAS bruto convertido pela curva-chave da estação',
+      issued: 'Previsão GloFAS emitida em',
+      observedDischarge: 'Vazão observada (telemetria ANA)',
+      observedStage: 'Cota observada (telemetria ANA)',
+      glofas: 'Previsão GloFAS (vazão de modelo)',
+      level: (years) => `GloFAS ${years} anos`,
+      levelAbove: (years, value) => `nível GloFAS de ${years} anos: ${value} m³/s, acima do gráfico`,
+      band: (date) => `PREVISÃO · emitida em ${date}`,
+      observedBand: 'OBSERVADO',
+      leadDay: (day) => `dia ${day} da previsão`,
+      scaled: (k, days, start, end) => `previsão ajustada à observação: GloFAS × ${k} (mediana de ${days} dias, ${start} a ${end})`,
+      notScaled: {
+        unavailable: () => 'GloFAS bruto, sem ajuste à observação',
+        no_telemetry: () => 'GloFAS bruto, sem ajuste: a estação não tem vazão por telemetria',
+        too_few_days: () => 'GloFAS bruto, sem ajuste: menos de 3 dias completos de telemetria para comparar',
+        out_of_range: (k) => `GloFAS bruto, sem ajuste: o GloFAS difere da observação por mais de 5 vezes (k = ${k}); este rio não está bem representado no modelo`,
+      },
+      scaledForecast: (k) => `Previsão ajustada (GloFAS × ${k})`,
+      rawForecast: 'GloFAS bruto',
+      scaledLevel: (years) => `GloFAS ${years} anos × k`,
+      forecastStage: 'Cota estimada da previsão (curva-chave)',
+      issueDay: 'Emissão da previsão',
+      discharge: 'Vazão (m³/s)',
+      stage: 'Cota (cm)',
+      noTelemetry: 'Esta estação não tem telemetria da ANA; só a previsão é mostrada.',
+      note: 'Experimental, não é um alerta oficial. A observação vem da telemetria da ANA (dados brutos, média diária). A previsão é a rodada de controle do GloFAS v4 (Copernicus Emergency Management Service) na célula de rio associada à estação. Ajuste à observação: a previsão é multiplicada por k, a mediana, nos últimos 7 dias completos, da razão entre a vazão observada e a vazão do primeiro dia de cada previsão do GloFAS para o mesmo dia. O ajuste remove um desvio proporcional constante; não corrige erros de tempo nem erros que mudam com a vazão, e é aplicado só com pelo menos 3 dias e k entre 0,2 e 5. O nível de 2 anos do GloFAS é multiplicado pelo mesmo k. A cota prevista converte a vazão prevista pela curva-chave da estação (a válida na data ou, sem ela, a mais recente) e é comparada com os limiares de alerta e de inundação do LIMIAR. Mesmo com o ajuste, essa cota pode se afastar da que vai ocorrer, e mais nos últimos dias da previsão; acima da faixa da curva-chave, ela não é calculada. A previsão do Google Flood Forecasting será adicionada quando o acesso à API for liberado. Para alertas oficiais, consulte o',
+      officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> e o <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SACE/SGB</a>.',
+    },
+    provisionalNote: (date) => `dados consistidos pela ANA em geral até ${date}; depois disso, dados brutos e provisórios`,
+    provisionalDay: 'Dado bruto (provisório)',
+    provisionalSeries: 'Dados brutos (provisórios)',
+    consistedThrough: 'Consistido até',
+    csvConsisted: 'consistido',
+    csvRaw: 'bruto',
+    segmentOf: 'de',
+    openEnded: 'em aberto',
+    noBankfull: 'sem margens plenas válidas',
     theoryButton: 'Como funciona',
     layersButton: 'Camadas',
     fitMapButton: 'Ajustar mapa',
@@ -208,7 +289,7 @@ const TEXT = {
       all: 'Todos',
       normal: 'Normal',
       warning: 'Alerta',
-      flooded: 'Inundada',
+      flooded: 'Inundação',
       extreme_flooding: 'Inundação extrema',
       no_data: 'Sem dados',
     },
@@ -233,8 +314,8 @@ const TEXT = {
     legend: {
       normal: 'Normal',
       warning: 'Alerta',
-      flooded: 'Inundada',
-      extreme_flooding: 'Extrema',
+      flooded: 'Inundação',
+      extreme_flooding: 'Inundação extrema',
       no_data: 'Sem dados',
     },
     fields: {
@@ -288,6 +369,43 @@ const TEXT = {
       methodSection: 'Como interpretar esta estação',
       methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. A evidência hidráulica observada define o limiar principal quando disponível. Nas demais estações, o Q2 estatístico define o limiar. O sistema apresenta registros históricos e não opera alertas em tempo real.',
       statusSection: 'Situação na data selecionada',
+      chartsGroup: 'Gráficos da estação',
+      nativeChartsNote: 'Estes são gráficos nativos do Word. Clique com o botão direito em um gráfico para mudar eixos, cores e fontes, ou escolha Editar Dados para abrir os valores no Excel.',
+      windows: { 30: '30 dias em torno da data selecionada', 90: '90 dias em torno da data selecionada', full: 'registro completo' },
+      bandLabels: { low: 'Cota de margens plenas, percentil 10', median: 'Cota de margens plenas, mediana', high: 'Cota de margens plenas, percentil 90' },
+      page: { label: 'Página', of: 'de' },
+      methods: {
+        title: 'Métodos e incerteza',
+        intro: 'Esta seção resume como os valores deste relatório foram calculados. Os procedimentos completos estão no manuscrito do LIMIAR e nas Seções S3 a S7 do Material Suplementar.',
+        thresholdHeading: 'Limiar de margens plenas',
+        thresholdText: 'Em cada seção transversal levantada, o talvegue é o ponto mais profundo. A cota de margens plenas, H_{bf}, é a menor entre as cotas mais altas levantadas de cada lado do talvegue. Quando a estação registra cota diária, ela é comparada diretamente com H_{bf}. Caso contrário, a curva-chave válida na data converte H_{bf} em vazão de margens plenas, Q_{bf}:',
+        thresholdAfter: 'a, h_{0} e n são os coeficientes do trecho da curva-chave que contém H_{bf} (cota em m, vazão em m³/s). Um novo período de limiar começa quando a seção ou a curva-chave ativa muda, de modo que o limiar pode variar ao longo do registro.',
+        statHeading: 'Referência estatística',
+        statText: 'Sem limiar de seção levantada, o limiar é a vazão de dois anos de tempo de retorno, Q_{RP2}. Os máximos anuais de vazão M são tomados por ano hidrológico (1º de outubro a 30 de setembro), com ao menos 90% de dias válidos por ano e ao menos 10 anos válidos. Uma distribuição de Gumbel é ajustada pelo método dos momentos, com média M̄ e desvio-padrão s_{M} dos máximos anuais:',
+        statAfter: 'Q_{RP2} é Q_{T} para T = 2 anos. É uma referência estatística de vazão alta e não se supõe igual à vazão de margens plenas.',
+        classesHeading: 'Condições diárias',
+        classesText: 'Cada dia é comparado com os limiares ativos naquela data. Normal fica abaixo de todos os limiares disponíveis, e Sem dados indica ausência de observação válida.',
+        classes: [
+          'Alerta: igual ou acima de Q_{T} para T = 1,25 ano e abaixo do limiar de inundação.',
+          'Inundação: igual ou acima do limiar de margens plenas ou, sem ele, de Q_{RP2}.',
+          'Inundação extrema: igual ou acima de Q_{T} para T = 3,5 anos.',
+        ],
+        classesAfter: 'Em estações analisadas em cota, essas vazões são convertidas em cota pela curva-chave inversa:',
+        classesNote: 'Um limiar de alerta igual ou acima do limiar de inundação, ou um limiar severo igual ou abaixo dele, não é usado.',
+        eventsHeading: 'Eventos reconstruídos',
+        eventsText: 'Um evento é uma sequência contínua de dias válidos igual ou acima do limiar ativo. Um dia abaixo do limiar, ou uma falha no registro, encerra o evento.',
+        uncertaintyHeading: 'Incerteza e limitações',
+        provisional: (raw, total, share, date) => `Dos ${total} dias observados desta estação, ${raw} (${share}) usam dados brutos que a ANA ainda não consistiu e podem mudar quando forem consistidos. No site, eles aparecem sombreados no gráfico da série e marcados na coluna ana_consistency do CSV. Os dados consistidos vão até ${date}.`,
+        uncertainty: [
+          'A cota de margens plenas vem de uma regra geométrica aplicada em todo o país. A interpretação de campo pode variar entre rios.',
+          'A comparação em cota supõe que a série diária e a seção usam a mesma referência vertical, o que as tabelas públicas não permitem verificar em todas as estações.',
+          'A conversão carrega o erro da curva-chave e só é usada dentro da faixa de cotas de cada trecho.',
+          'Q_{RP2} tem incerteza amostral, que diminui com registros mais longos. O modelo de Gumbel não representa mudanças da frequência de cheias no tempo.',
+          'A faixa sombreada da seção transversal vai do percentil 10 ao 90 da cota de margens plenas entre os períodos de limiar. Ela mostra a variação entre levantamentos, não um intervalo de confiança.',
+          'O rótulo de incerteza depende do tipo de limiar: média para seção levantada e alta para Q_{RP2}. O uso recomendado vem das verificações automáticas de dados.',
+          'Superar um limiar é uma condição no posto. Isso não mostra que a planície foi inundada nem a extensão da água. O LIMIAR apresenta reconstruções históricas e não é um serviço de alerta.',
+        ],
+      },
       chartSection: 'Série temporal principal',
       chartCaption: 'Registro diário observado com a data selecionada e os limiares aplicados.',
       crossSectionSection: 'Evolução das seções transversais',
@@ -388,6 +506,71 @@ const TEXT = {
     timelineNote: 'Shaded band: stations whose record spans each year',
     timelineOverviewLabel: 'Choose the year in the full record',
     timelineDetailLabel: 'Choose the day in the 12-month window',
+    maximizeChart: 'Maximize chart',
+    chartUnavailable: 'This chart is not available yet.',
+    crossSectionTableTitle: 'Cross-section surveys',
+    crossSectionTableNote: 'Computed on the full profile: the thalweg is the lowest point and bankfull stage is the lower of the two banks.',
+    thSurveyDate: 'Survey date',
+    thThalweg: 'Thalweg (cm)',
+    thLeftBank: 'Left bank (cm)',
+    thRightBank: 'Right bank (cm)',
+    thBankfull: 'Bankfull stage (cm)',
+    thDepth: 'Depth to bankfull (cm)',
+    ratingTableTitle: 'Rating curves',
+    ratingTableNote: 'One segment per row. H is stage in metres and Q discharge in m³/s.',
+    thValidFrom: 'Valid from',
+    thValidTo: 'Valid to',
+    thSegment: 'Segment',
+    thConsistency: 'Consistency',
+    thStageRange: 'Stage range (cm)',
+    thEquation: 'Equation',
+    exportCrossSectionTableCsvButton: 'Download table',
+    exportRatingTableCsvButton: 'Download table',
+    consistencyRaw: 'Raw (1)',
+    consistencyChecked: 'Consisted (2)',
+    dataVersion: 'Data version',
+    forecast: {
+      title: 'Last 30 days and forecast (experimental)',
+      titleDischarge: 'Discharge: last 30 days and forecast (experimental)',
+      titleStage: 'Stage: last 30 days and forecast (experimental)',
+      stageFromScaled: 'forecast stage = scaled forecast converted through the station’s rating curve',
+      stageFromRaw: 'forecast stage = raw GloFAS converted through the station’s rating curve',
+      issued: 'GloFAS forecast issued',
+      observedDischarge: 'Observed discharge (ANA telemetry)',
+      observedStage: 'Observed stage (ANA telemetry)',
+      glofas: 'GloFAS forecast (model discharge)',
+      level: (years) => `GloFAS ${years}-year`,
+      levelAbove: (years, value) => `GloFAS ${years}-year level: ${value} m³/s, above the chart`,
+      band: (date) => `FORECAST · issued ${date}`,
+      observedBand: 'OBSERVED',
+      leadDay: (day) => `forecast day ${day}`,
+      scaled: (k, days, start, end) => `forecast scaled to observations: GloFAS × ${k} (median of ${days} days, ${start} to ${end})`,
+      notScaled: {
+        unavailable: () => 'raw GloFAS, not scaled to observations',
+        no_telemetry: () => 'raw GloFAS, not scaled: the station has no telemetered discharge',
+        too_few_days: () => 'raw GloFAS, not scaled: fewer than 3 complete days of telemetry to compare',
+        out_of_range: (k) => `raw GloFAS, not scaled: GloFAS differs from the observations by more than 5 times (k = ${k}); the model does not represent this river well`,
+      },
+      scaledForecast: (k) => `Scaled forecast (GloFAS × ${k})`,
+      rawForecast: 'Raw GloFAS',
+      scaledLevel: (years) => `GloFAS ${years}-year × k`,
+      forecastStage: 'Forecast stage (rating curve)',
+      issueDay: 'Forecast issue',
+      discharge: 'Discharge (m³/s)',
+      stage: 'Stage (cm)',
+      noTelemetry: 'This station has no ANA telemetry; only the forecast is shown.',
+      note: 'Experimental, not an official warning. Observations come from ANA telemetry (raw data, daily mean). The forecast is the GloFAS v4 control run (Copernicus Emergency Management Service) at the river cell matched to the station. Scaling to observations: the forecast is multiplied by k, the median over the last 7 complete days of observed flow divided by GloFAS’s first-day forecast for the same day. It removes a constant proportional offset; it does not correct timing errors or errors that change with flow, and it is applied only with at least 3 days and k between 0.2 and 5. GloFAS’s 2-year level is multiplied by the same k. Forecast stage converts the forecast discharge through the station’s rating curve (the one valid on the date, otherwise the most recent) and is compared with LIMIAR’s warning and flood thresholds. Even after scaling, this stage can differ from the stage that will occur, more so in the later forecast days; above the rating-curve range it is not computed. The Google Flood Forecasting forecast will be added once API access is granted. For official warnings, see',
+      officialLinks: '<a href="https://www.gov.br/cemaden/" target="_blank" rel="noopener">Cemaden</a> and <a href="https://www.sgb.gov.br/sace/" target="_blank" rel="noopener">SGB SACE</a>.',
+    },
+    provisionalNote: (date) => `ANA consisted data typically through ${date}; raw, provisional data after that`,
+    provisionalDay: 'Raw data (provisional)',
+    provisionalSeries: 'Raw data (provisional)',
+    consistedThrough: 'Consisted through',
+    csvConsisted: 'consisted',
+    csvRaw: 'raw',
+    segmentOf: 'of',
+    openEnded: 'open',
+    noBankfull: 'no valid bankfull stage',
     theoryButton: 'How it works',
     layersButton: 'Layers',
     fitMapButton: 'Fit map',
@@ -396,7 +579,7 @@ const TEXT = {
     actionsMenuLabel: 'Actions',
     eyebrowLabel: 'Historical flood reconstruction',
     heroTitle: 'Flood conditions by station and date',
-    heroText: 'Choose a date to find stations under normal, warning, flooded, or extreme flooding conditions.',
+    heroText: 'Choose a date to find stations under normal, warning, flood, or extreme flood conditions.',
     statStationsLabel: 'Published stations',
     statRangeLabel: 'Date range',
     statLatestLabel: 'Latest date',
@@ -430,7 +613,7 @@ const TEXT = {
     dailyConditionsTitle: 'Distribution of conditions',
     dailyConditionsSubtitle: 'Number and share of stations in each class.',
     dailySpatialTitle: 'Spatial distribution of conditions outside normal',
-    dailySpatialSubtitle: 'Warning, flooded, and extreme conditions grouped into five-degree bands.',
+    dailySpatialSubtitle: 'Warning, flood, and extreme flood conditions grouped into five-degree bands.',
     dailyLatitudeTitle: 'By latitude',
     dailyLongitudeTitle: 'By longitude',
     dailyStateRankingTitle: 'States with the highest share outside normal',
@@ -519,8 +702,8 @@ const TEXT = {
       all: 'All',
       normal: 'Normal',
       warning: 'Warning',
-      flooded: 'Flooded',
-      extreme_flooding: 'Extreme flooding',
+      flooded: 'Flood',
+      extreme_flooding: 'Extreme flood',
       no_data: 'No data',
     },
     basis: {
@@ -544,8 +727,8 @@ const TEXT = {
     legend: {
       normal: 'Normal',
       warning: 'Warning',
-      flooded: 'Flooded',
-      extreme_flooding: 'Extreme',
+      flooded: 'Flood',
+      extreme_flooding: 'Extreme flood',
       no_data: 'No data',
     },
     fields: {
@@ -599,6 +782,43 @@ const TEXT = {
       methodSection: 'How to interpret this station',
       methodText: 'LIMIAR compares each observed daily value with the thresholds valid for that period. Observed hydraulic evidence defines the primary threshold when available. At the remaining stations, statistical Q2 defines the threshold. The system presents historical records and does not issue real-time warnings.',
       statusSection: 'Selected-day conditions',
+      chartsGroup: 'Station charts',
+      nativeChartsNote: 'These are native Word charts. Right-click a chart to change its axes, colours, and fonts, or choose Edit Data to open its values in Excel.',
+      windows: { 30: '30 days around the selected date', 90: '90 days around the selected date', full: 'full record' },
+      bandLabels: { low: 'Bankfull stage, 10th percentile', median: 'Bankfull stage, median', high: 'Bankfull stage, 90th percentile' },
+      page: { label: 'Page', of: 'of' },
+      methods: {
+        title: 'Methods and uncertainty',
+        intro: 'This section summarizes how the values in this report were computed. The full procedures are in the LIMIAR manuscript and in Supplementary Sections S3 to S7.',
+        thresholdHeading: 'Bankfull threshold',
+        thresholdText: 'For each surveyed cross section, the thalweg is the deepest surveyed point. Bankfull stage, H_{bf}, is the lower of the highest surveyed elevations on each side of the thalweg. Where the station records daily stage, it is compared directly with H_{bf}. Otherwise, the rating curve valid on that date converts H_{bf} to bankfull discharge, Q_{bf}:',
+        thresholdAfter: 'a, h_{0}, and n are the coefficients of the rating-curve segment that contains H_{bf} (stage in m, discharge in m³/s). A new threshold period begins when the active cross section or rating curve changes, so the threshold can change through the record.',
+        statHeading: 'Statistical reference',
+        statText: 'Without a threshold from a surveyed cross section, the threshold is the two-year return discharge, Q_{RP2}. Annual maximum discharges M are taken by hydrological year (1 October to 30 September), with at least 90% valid days per year and at least 10 valid years. A Gumbel distribution is fitted by the method of moments, with mean M̄ and standard deviation s_{M} of the annual maxima:',
+        statAfter: 'Q_{RP2} is Q_{T} at T = 2 years. It is a statistical high-flow reference and is not assumed to equal bankfull discharge.',
+        classesHeading: 'Daily conditions',
+        classesText: 'Each day is compared with the thresholds active on that date. Normal is below every available threshold, and No data means no valid observation.',
+        classes: [
+          'Warning: at or above Q_{T} at T = 1.25 years and below the flood threshold.',
+          'Flood: at or above the bankfull threshold or, where there is none, Q_{RP2}.',
+          'Extreme flood: at or above Q_{T} at T = 3.5 years.',
+        ],
+        classesAfter: 'At stations analysed in stage, these discharges are converted to stage with the inverse rating curve:',
+        classesNote: 'An alert threshold at or above the flood threshold, or a severe threshold at or below it, is not used.',
+        eventsHeading: 'Reconstructed events',
+        eventsText: 'An event is a continuous run of valid days at or above the active threshold. One day below the threshold, or a gap in the record, ends the event.',
+        uncertaintyHeading: 'Uncertainty and limits',
+        provisional: (raw, total, share, date) => `Of this station's ${total} observed days, ${raw} (${share}) use raw data that ANA has not yet consisted and may change once they are. On the site they are shaded in the time-series chart and marked in the ana_consistency column of the CSV. Consisted data run through ${date}.`,
+        uncertainty: [
+          'Bankfull stage comes from one geometric rule applied nationally. Field interpretations can differ among rivers.',
+          'Stage comparison assumes that the daily series and the cross section share a vertical reference, which the public tables do not allow us to check at every station.',
+          'Conversion carries the error of the rating curve and is used only within the stage range of each curve segment.',
+          'Q_{RP2} has sampling uncertainty that decreases with longer records. The Gumbel model does not represent changes in flood frequency through time.',
+          'The shaded band in the cross-section chart spans the 10th to 90th percentiles of bankfull stage across threshold periods. It shows variation among surveys, not a confidence interval.',
+          'The uncertainty label depends on threshold type: medium for a surveyed cross section and high for Q_{RP2}. Recommended use comes from the automated data checks.',
+          'Exceeding a threshold is a condition at the gauge. It does not show that the floodplain was inundated or how far water spread. LIMIAR presents historical reconstructions and is not a warning service.',
+        ],
+      },
       chartSection: 'Primary time series',
       chartCaption: 'Observed daily record with the selected day and the thresholds applied to that period.',
       crossSectionSection: 'Cross-section evolution',
@@ -981,6 +1201,8 @@ const state = {
   selectedCode: null,
   selectedData: null,
   stationCache: new Map(),
+  forecastCache: new Map(),
+  selectedForecast: null,
   charts: {},
   markersLayer: null,
   currentRange: '90',
@@ -1085,21 +1307,6 @@ function curveKey(curveId, segmentId) {
   return `${curveId || ''}||${segmentId || ''}`;
 }
 
-function latestRatingCurve(stationData) {
-  const curves = (stationData.hydraulic?.ratingCurves || []).filter((curve) =>
-    curve
-    && isFiniteNumber(curve.coefficientA)
-    && isFiniteNumber(curve.coefficientH0)
-    && isFiniteNumber(curve.coefficientN)
-  );
-  if (!curves.length) return null;
-  return curves.slice().sort((left, right) => {
-    const leftKey = left.validTo || left.validFrom || `${left.year || 0}`;
-    const rightKey = right.validTo || right.validFrom || `${right.year || 0}`;
-    return String(leftKey).localeCompare(String(rightKey));
-  }).at(-1);
-}
-
 function crossSectionBand(stationData) {
   const values = stationData.intervalsHydrated
     .map((interval) => (interval.valueType === 'stage_cm' ? Number(interval.flood) : null))
@@ -1124,6 +1331,8 @@ const CHART_THEME = {
   severe: '#7a1f2b',
   selected: '#17272d',
 };
+
+const CHART_AXIS_COLOR = '#8c9a9f';
 
 const CURVE_COLORS = ['#173f5f', '#20639b', '#3caea3', '#7f8c58', '#d49a35', '#d66a4a', '#a43d59', '#663a70'];
 
@@ -1156,13 +1365,17 @@ function chartScale({ title, type, position, maxTicksLimit, beginAtZero, display
       padding: 7,
       font: { size: 11 },
     },
+    // Gridlines stay inside the plot; major tick marks point outward from every axis.
     grid: {
-      display: displayGrid,
+      display: true,
+      drawOnChartArea: displayGrid,
       color: CHART_THEME.grid,
-      tickLength: 0,
-      drawBorder: false,
+      drawTicks: true,
+      tickLength: 6,
+      tickColor: CHART_AXIS_COLOR,
+      tickWidth: 1,
     },
-    border: { display: false },
+    border: { display: true, color: CHART_AXIS_COLOR, width: 1 },
     ...(title ? {
       title: {
         display: true,
@@ -1240,27 +1453,126 @@ const thresholdLabelsPlugin = {
       .sort((left, right) => left.y - right.y);
     if (!labels.length) return;
 
-    const minimumGap = 18;
+    const fontSize = Number(options.fontSize) || 10;
+    const halfHeight = fontSize * 0.8;
+    const minimumGap = fontSize + 8;
     labels.forEach((label, index) => {
       if (index && label.y - labels[index - 1].y < minimumGap) {
         label.y = labels[index - 1].y + minimumGap;
       }
-      label.y = Math.min(chart.chartArea.bottom - 8, Math.max(chart.chartArea.top + 8, label.y));
+      label.y = Math.min(chart.chartArea.bottom - halfHeight, Math.max(chart.chartArea.top + halfHeight, label.y));
     });
 
     const { ctx, chartArea } = chart;
     ctx.save();
-    ctx.font = '600 10px "Source Sans 3", sans-serif';
+    ctx.font = `600 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     labels.forEach((label) => {
       const width = ctx.measureText(label.text).width + 12;
       const x = chartArea.right - 4;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
-      ctx.fillRect(x - width, label.y - 8, width, 16);
+      ctx.fillRect(x - width, label.y - halfHeight, width, halfHeight * 2);
       ctx.fillStyle = label.color;
       ctx.fillText(label.text, x - 6, label.y);
     });
+    ctx.restore();
+  },
+};
+
+// A white plotting area with a frame on all four sides, under and over the data respectively.
+const plotFramePlugin = {
+  id: 'plotFrame',
+  beforeDraw(chart, _args, options) {
+    if (options?.enabled === false || !chart.chartArea) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+    ctx.restore();
+  },
+  afterDraw(chart, _args, options) {
+    if (options?.enabled === false || !chart.chartArea) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.strokeStyle = CHART_AXIS_COLOR;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      Math.round(chartArea.left) + 0.5,
+      Math.round(chartArea.top) + 0.5,
+      Math.round(chartArea.right - chartArea.left) - 1,
+      Math.round(chartArea.bottom - chartArea.top) - 1,
+    );
+    ctx.restore();
+  },
+};
+
+// Grey bands behind the data where the series uses raw (unconsisted) ANA records.
+const provisionalShadePlugin = {
+  id: 'provisionalShade',
+  beforeDatasetsDraw(chart, _args, options) {
+    const runs = options?.runs;
+    if (!runs?.length || !chart.scales?.x || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const count = chart.data.labels?.length || 1;
+    const halfStep = (chartArea.right - chartArea.left) / Math.max(1, count - 1) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(35, 56, 63, 0.08)';
+    runs.forEach(([start, end]) => {
+      const left = Math.max(chartArea.left, scales.x.getPixelForValue(start) - halfStep);
+      const right = Math.min(chartArea.right, scales.x.getPixelForValue(end) + halfStep);
+      if (right > left) ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+    });
+    if (options.label) {
+      const [start, end] = runs[runs.length - 1];
+      const left = Math.max(chartArea.left, scales.x.getPixelForValue(start) - halfStep);
+      const right = Math.min(chartArea.right, scales.x.getPixelForValue(end) + halfStep);
+      const fontSize = Number(options.fontSize) || 11;
+      ctx.font = `600 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
+      if (ctx.measureText(options.label).width + 8 <= right - left) {
+        ctx.fillStyle = CHART_THEME.muted;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(options.label, left + 4, chartArea.top + 4);
+      }
+    }
+    ctx.restore();
+  },
+};
+
+// A pale yellow band behind the forecast days, labelled with the issue date, so forecast and
+// observation cannot be confused.
+const forecastShadePlugin = {
+  id: 'forecastShade',
+  beforeDatasetsDraw(chart, _args, options) {
+    if (!options?.start || !chart.scales?.x || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const count = chart.data.labels?.length || 1;
+    const halfStep = (chartArea.right - chartArea.left) / Math.max(1, count - 1) / 2;
+    const left = Math.max(chartArea.left, scales.x.getPixelForValue(options.start) - halfStep);
+    const right = Math.min(chartArea.right, scales.x.getPixelForValue(options.end || options.start) + halfStep);
+    if (!(right > left)) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(232, 184, 64, 0.16)';
+    ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+    ctx.strokeStyle = 'rgba(176, 124, 20, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(left) + 0.5, chartArea.top);
+    ctx.lineTo(Math.round(left) + 0.5, chartArea.bottom);
+    ctx.stroke();
+    const fontSize = Number(options.fontSize) || 11;
+    ctx.font = `700 ${fontSize}px ${options.fontFamily || '"Source Sans 3", sans-serif'}`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    if (options.label) {
+      ctx.fillStyle = '#8a5a00';
+      ctx.fillText(options.label, left + 6, chartArea.top + 5);
+    }
+    if (options.observedLabel && left - chartArea.left > ctx.measureText(options.observedLabel).width + 12) {
+      ctx.fillStyle = CHART_THEME.muted;
+      ctx.fillText(options.observedLabel, chartArea.left + 6, chartArea.top + 5);
+    }
     ctx.restore();
   },
 };
@@ -1290,7 +1602,7 @@ if (window.Chart?.register) {
   window.Chart.defaults.font.size = 12;
   window.Chart.defaults.elements.line.borderCapStyle = 'round';
   window.Chart.defaults.elements.line.borderJoinStyle = 'round';
-  window.Chart.register(thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
+  window.Chart.register(plotFramePlugin, provisionalShadePlugin, forecastShadePlugin, thresholdBandPlugin, thresholdLabelsPlugin, selectedDateLinePlugin);
 }
 
 function showToast(message, duration = 2200) {
@@ -2121,38 +2433,58 @@ function evidenceSummaryText(stationData, context) {
     : `${context.intervalCount} threshold intervals were identified across the record. Bars show observed annual maxima, and markers highlight years with cross-section updates. ${q2Phrase}`;
 }
 
-async function renderChartConfigToBytes(config, width, height) {
+const REPORT_CHART_FONT_FAMILY = 'Helvetica, "Helvetica Neue", Arial, sans-serif';
+
+function reportChartFont(font, bold = false) {
+  return {
+    ...(font || {}),
+    family: REPORT_CHART_FONT_FAMILY,
+    size: REPORT_MIN_CHART_FONT_PT,
+    weight: bold ? '700' : '300',
+  };
+}
+
+function applyReportChartTypography(options, sourceOptions) {
+  options.font = reportChartFont(options.font);
+  const plugins = options.plugins || {};
+  options.plugins = plugins;
+  if (plugins.legend?.labels) {
+    Object.assign(plugins.legend.labels, {
+      font: reportChartFont(plugins.legend.labels.font),
+      boxWidth: 12,
+      boxHeight: 12,
+      pointStyleWidth: 16,
+      padding: 14,
+    });
+    // JSON cloning drops functions, so the on-screen legend filter is restored here.
+    const legendFilter = sourceOptions?.plugins?.legend?.labels?.filter;
+    if (legendFilter) plugins.legend.labels.filter = legendFilter;
+  }
+  if (plugins.thresholdLabels) {
+    plugins.thresholdLabels.fontSize = REPORT_MIN_CHART_FONT_PT;
+    plugins.thresholdLabels.fontFamily = REPORT_CHART_FONT_FAMILY;
+  }
+  Object.values(options.scales || {}).forEach((scale) => {
+    if (scale?.ticks) {
+      Object.assign(scale.ticks, { font: reportChartFont(scale.ticks.font), maxRotation: 0, autoSkipPadding: 12 });
+    }
+    if (scale?.title?.display) scale.title.font = reportChartFont(scale.title.font, true);
+  });
+}
+
+async function renderChartConfigToBytes(config, layout) {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = layout.canvasWidth;
+  canvas.height = layout.canvasHeight;
   const exportConfig = JSON.parse(JSON.stringify(config));
   exportConfig.options = {
     ...(exportConfig.options || {}),
     animation: false,
     responsive: false,
     maintainAspectRatio: false,
+    devicePixelRatio: layout.pixelRatio,
   };
-  if (exportConfig.options?.plugins?.legend?.labels) {
-    exportConfig.options.plugins.legend.labels.font = {
-      ...(exportConfig.options.plugins.legend.labels.font || {}),
-      size: 24,
-    };
-  }
-  Object.values(exportConfig.options?.scales || {}).forEach((scale) => {
-    if (scale?.ticks) {
-      scale.ticks.font = {
-        ...(scale.ticks.font || {}),
-        size: 24,
-      };
-    }
-    if (scale?.title?.display) {
-      scale.title.font = {
-        ...(scale.title.font || {}),
-        size: 26,
-        weight: '600',
-      };
-    }
-  });
+  applyReportChartTypography(exportConfig.options, config.options);
   const chart = new Chart(canvas.getContext('2d'), exportConfig);
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   const bytes = await dataUrlToUint8Array(canvas.toDataURL('image/png', 1));
@@ -2160,15 +2492,15 @@ async function renderChartConfigToBytes(config, width, height) {
   return bytes;
 }
 
-async function chartToBytes(chartKey, width, height) {
+async function chartToBytes(chartKey, layout) {
   const chart = state.charts[chartKey];
   if (!chart) return null;
-  return renderChartConfigToBytes(chart.config._config, width, height);
+  return renderChartConfigToBytes(chart.config._config, layout);
 }
 
-async function safeChartToBytes(chartKey, width, height) {
+async function safeChartToBytes(chartKey, layout) {
   try {
-    return await chartToBytes(chartKey, width, height);
+    return await chartToBytes(chartKey, layout);
   } catch (error) {
     console.warn(`Could not export chart ${chartKey} to image.`, error);
     return null;
@@ -2258,6 +2590,7 @@ function applyStaticTranslations() {
   const keys = [
     'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton', 'actionsMenuLabel',
     'timelineTitle', 'timelineNote',
+    'crossSectionTableTitle', 'crossSectionTableNote', 'thSurveyDate', 'thThalweg', 'thLeftBank', 'thRightBank', 'thBankfull', 'thDepth', 'ratingTableTitle', 'ratingTableNote', 'thValidFrom', 'thValidTo', 'thSegment', 'thConsistency', 'thStageRange', 'thEquation', 'exportCrossSectionTableCsvButton', 'exportRatingTableCsvButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
     'ratingCurveFilterLabel', 'ufFilterLabel', 'basinFilterLabel', 'biomeFilterLabel', 'stationListTitle', 'selectedStatusEyebrow',
@@ -2291,6 +2624,10 @@ function applyStaticTranslations() {
   byId('timelineOverview')?.setAttribute('aria-label', text('timelineOverviewLabel'));
   byId('timelineDetail')?.setAttribute('aria-label', text('timelineDetailLabel'));
   if (state.manifest) renderTimeline(true);
+  // The legend is built in code, so it must be redrawn whenever the language changes,
+  // including the language read from the URL on first load.
+  if (byId('legendItems')) renderLegend();
+  translateChartMaximizeButtons();
   const languageSwitch = document.querySelector('.language-switch');
   if (languageSwitch) languageSwitch.setAttribute('aria-label', text('languageSwitchLabel'));
   const actionsSummary = document.querySelector('.actions-menu summary');
@@ -2592,6 +2929,14 @@ function renderGlobalStats() {
   byId('statStations').textContent = formatNumber(state.manifest.published_station_count);
   byId('statRange').textContent = `${formatShortDate(state.manifest.supported_date_min)} - ${formatShortDate(state.manifest.supported_date_max)}`;
   byId('statLatest').textContent = formatShortDate(state.manifest.latest_status_date);
+  const note = byId('dataVersionNote');
+  const version = state.manifest.data_version;
+  const provisionalStations = Number(state.manifest.provisional_station_count) || 0;
+  note.hidden = !version;
+  note.textContent = [
+    version ? `${text('dataVersion')} ${version}` : '',
+    provisionalStations && state.manifest.consisted_through_median ? text('provisionalNote')(formatDate(state.manifest.consisted_through_median)) : '',
+  ].filter(Boolean).join(' · ');
 }
 
 function statusTotals() {
@@ -3163,11 +3508,19 @@ function hydrateStationData(raw) {
   const hydrated = structuredClone(raw);
   const startDate = raw.daily.start_date;
   hydrated.hydraulic = {
-    crossSections: (raw.hydraulic?.cross_sections || []).map(([date, id, points]) => ({
-      date,
-      id,
-      points: (points || []).map(([x, y]) => ({ x: Number(x), y: Number(y) })),
-    })),
+    crossSections: (raw.hydraulic?.cross_sections || []).map(([date, id, points, geometry]) => {
+      const profile = (points || []).map(([x, y]) => ({ x: Number(x), y: Number(y) }));
+      // Exported geometry comes from the full profile; the points are simplified to 180.
+      const [thalweg, leftBank, rightBank, bankfull, flags] = geometry || [];
+      return {
+        date,
+        id,
+        points: profile,
+        geometry: geometry
+          ? { thalweg, leftBank, rightBank, bankfull, depth: bankfull != null && thalweg != null ? bankfull - thalweg : null, flags: flags || '' }
+          : { ...(bankfullFromProfile(profile) || {}), flags: '' },
+      };
+    }),
     ratingCurves: (raw.hydraulic?.rating_curves || []).map(([validFrom, validTo, year, curveId, segmentId, stageMin, stageMax, coefficientA, coefficientH0, coefficientN]) => ({
       validFrom,
       validTo,
@@ -3182,12 +3535,16 @@ function hydrateStationData(raw) {
       key: curveKey(curveId, segmentId),
     })),
   };
+  // Bundles built before monthly updates carry no consistency information.
+  hydrated.hasConsistency = Array.isArray(raw.daily.provisional);
+  const provisional = raw.daily.provisional || [];
   hydrated.dailyRows = raw.daily.rows.map(([offset, observed, statusChar, basisChar]) => ({
     offset: Number(offset),
     date: addDays(startDate, Number(offset)),
     observed_value: observed,
     status: statusKeyFromChar(statusChar),
     basis: basisKeyFromChar(basisChar),
+    provisional: observed != null && isProvisionalOffset(provisional, Number(offset)),
   }));
   hydrated.dailyMap = new Map(hydrated.dailyRows.map((row) => [row.date, row]));
   hydrated.intervalsHydrated = raw.intervals.map(([startOffset, endOffset, valueType, alert, flood, severe, thresholdSource, crossSectionDate, crossSectionId, flags, ratingCurveId, ratingCurveSegmentId]) => {
@@ -3212,6 +3569,21 @@ function hydrateStationData(raw) {
   });
   state.stationCache.set(raw.metadata.station_code, hydrated);
   return hydrated;
+}
+
+// The daily forecast bundle is optional: without it the forecast card stays hidden.
+async function loadForecast(stationCode) {
+  if (state.forecastCache.has(stationCode)) return state.forecastCache.get(stationCode);
+  let forecast = null;
+  try {
+    // The file keeps its name but changes every day, so the browser must revalidate it.
+    const response = await fetch(`forecast/stations/${stationCode}.json`, { cache: 'no-cache' });
+    if (response.ok) forecast = await response.json();
+  } catch {
+    forecast = null;
+  }
+  state.forecastCache.set(stationCode, forecast);
+  return forecast;
 }
 
 async function loadStationData(stationCode) {
@@ -3276,6 +3648,12 @@ function renderStatusCard(stationData) {
     span.textContent = index === 0 ? statusLabel(value) : (index === 1 ? basisLabel(value) : uncertaintyLabel(value));
     badgeWrap.appendChild(span);
   });
+  if (stationData.dailyMap.get(state.selectedDate)?.provisional) {
+    const span = document.createElement('span');
+    span.className = 'pill provisional';
+    span.textContent = text('provisionalDay');
+    badgeWrap.appendChild(span);
+  }
 
   const statusGrid = byId('statusGrid');
   const cards = [
@@ -3286,6 +3664,9 @@ function renderStatusCard(stationData) {
     [text('fields').severe, formatValue(details.severe, details.valueType)],
     [text('fields').range, `${formatShortDate(stationData.summary.daily_record_start)} - ${formatShortDate(stationData.summary.daily_record_end)}`],
   ];
+  if (stationData.dailyRows.some((row) => row.provisional)) {
+    cards.push([text('consistedThrough'), formatShortDate(stationData.summary.consisted_through)]);
+  }
   statusGrid.innerHTML = cards.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('');
 }
 
@@ -3333,12 +3714,279 @@ function destroyChart(id) {
 
 const STATION_CHART_RENDERERS = {
   timeseriesChart: renderTimeseriesChart,
+  forecastChart: renderForecastChart,
+  forecastStageChart: renderForecastStageChart,
   crossSectionChart: renderCrossSectionChart,
   dynamicDailyChart: renderDynamicDailyChart,
   ratingCurveChart: renderRatingCurveChart,
   evidenceChart: renderEvidenceChart,
   seasonalityChart: renderSeasonality,
 };
+
+// Only GloFAS's 2-year level is drawn, so the axis stays scaled to the hydrograph.
+const GLOFAS_LEVEL = { years: 2, key: 'rp2', color: CHART_THEME.alert };
+
+// LIMIAR thresholds for a date: the active interval, or the latest one after the record ends.
+function thresholdsForDate(stationData, dateString) {
+  const intervals = stationData.intervalsHydrated || [];
+  const last = intervals[intervals.length - 1];
+  const interval = findIntervalForDate(stationData, dateString) || (last && dateString > last.endDate ? last : null);
+  return normalizeThresholdTriplet(
+    interval ? interval.alert : null,
+    interval ? interval.flood : stationData.summary.threshold_value,
+    interval ? interval.severe : null,
+  );
+}
+
+// Everything both forecast charts need, as numbers on one daily timeline. LIMIAR's warning and flood
+// thresholds are given in discharge and in stage: a stage threshold goes to discharge through the
+// rating curve, and a discharge threshold to stage through its inverse (valid on the date, otherwise
+// the most recent; no extrapolation).
+function buildForecastModel(stationData, forecast) {
+  const observed = forecast.observed || { dates: [], stage_cm: [], discharge_m3s: [] };
+  const glofas = forecast.glofas;
+  const labels = continuousDates(observed.dates, glofas.dates);
+  const byDate = (dates, values) => {
+    const lookup = new Map(dates.map((date, index) => [date, values?.[index]]));
+    return labels.map((date) => lookup.get(date) ?? null);
+  };
+  // Scaled forecast: GloFAS x k, with k from the pipeline (median ratio of observed flow to GloFAS's
+  // first forecast day over the last complete days). When it applies, it is the forecast used for
+  // stage, and raw GloFAS stays as a faint reference line.
+  const scaling = glofas.scaled || { status: 'unavailable' };
+  const isScaled = scaling.status === 'applied' && Array.isArray(scaling.discharge_m3s);
+  const factor = isScaled ? Number(scaling.factor) : 1;
+  const rawForecast = byDate(glofas.dates, glofas.discharge_m3s);
+  const forecastDischarge = isScaled ? byDate(glofas.dates, scaling.discharge_m3s) : rawForecast;
+  const forecastDates = new Set(glofas.dates);
+  const curves = stationData.hydraulic?.ratingCurves || [];
+  const forecastStage = labels.map((date, index) => (
+    forecastDates.has(date) && curves.length ? validCurveStage(curves, date, forecastDischarge[index]).stage : null
+  ));
+  const isStageStation = stationData.summary.threshold_value_type === 'stage_cm';
+  const native = labels.map((date) => thresholdsForDate(stationData, date));
+  const convert = (date, value) => {
+    if (!isFiniteNumber(value) || !curves.length) return null;
+    return isStageStation ? validCurveDischarge(curves, date, value).discharge : validCurveStage(curves, date, value).stage;
+  };
+  const converted = native.map((row, index) => ({
+    alert: convert(labels[index], row.alert),
+    flood: convert(labels[index], row.flood),
+  }));
+  return {
+    labels,
+    glofas,
+    scaling,
+    isScaled,
+    factor,
+    hasTelemetry: Boolean(forecast.observed),
+    forecastDates,
+    observedDischarge: byDate(observed.dates, observed.discharge_m3s),
+    observedStage: byDate(observed.dates, observed.stage_cm),
+    rawForecast,
+    forecastDischarge,
+    forecastStage,
+    // The 2-year level is scaled by the same k, so it stays comparable with the scaled forecast.
+    rp2: Number(glofas.flood_levels_m3s?.[GLOFAS_LEVEL.key]) * factor,
+    dischargeThresholds: isStageStation ? converted : native,
+    stageThresholds: isStageStation ? native : converted,
+  };
+}
+
+function forecastStageAvailable(model) {
+  return [...model.observedStage, ...model.forecastStage].some(isFiniteNumber);
+}
+
+function forecastThresholdLines(thresholds) {
+  return [
+    ['alert', text('fields').alert, CHART_THEME.alert, [6, 4]],
+    ['flood', text('fields').flood, CHART_THEME.flood, [4, 3]],
+  ]
+    .filter(([key]) => thresholds.some((row) => isFiniteNumber(row[key])))
+    .map(([key, label, color, dash]) => ({
+      label,
+      data: thresholds.map((row) => row[key]),
+      borderColor: color,
+      pointRadius: 0,
+      borderWidth: 1.8,
+      borderDash: dash,
+      stepped: true,
+      thresholdLabel: label,
+      directLabel: true,
+    }));
+}
+
+function forecastChartOptions(model, words, yTitle, range, yColor) {
+  const { glofas } = model;
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    normalized: true,
+    interaction: { intersect: false, mode: 'index' },
+    layout: { padding: { top: 4 } },
+    plugins: chartPlugins({
+      legend: chartLegend({
+        filter(item, data) {
+          return data.datasets[item.datasetIndex]?.directLabel !== true;
+        },
+      }),
+      thresholdLabels: { enabled: true },
+      forecastShade: {
+        start: glofas.dates[0],
+        end: glofas.dates[glofas.dates.length - 1],
+        label: words.band(formatDate(glofas.issued)),
+        observedLabel: model.hasTelemetry ? words.observedBand : '',
+      },
+      tooltip: {
+        ...chartPlugins().tooltip,
+        callbacks: {
+          title(items) {
+            const date = items[0]?.label;
+            const lead = glofas.dates.indexOf(date);
+            return lead >= 0 ? `${formatDate(date)} · ${words.leadDay(lead + 1)}` : formatDate(date);
+          },
+        },
+      },
+    }),
+    scales: {
+      x: chartScale({ maxTicksLimit: 8 }),
+      y: {
+        ...chartScale({ title: yTitle, tickColor: yColor }),
+        ...(range || {}),
+        title: { display: true, text: yTitle, color: yColor || CHART_THEME.muted, font: { size: 12, weight: '600' } },
+      },
+    },
+  };
+}
+
+function currentForecastModel(stationData) {
+  const forecast = state.selectedForecast?.station_code === stationData.metadata.station_code ? state.selectedForecast : null;
+  return forecast ? buildForecastModel(stationData, forecast) : null;
+}
+
+function renderForecastChart(stationData) {
+  const model = currentForecastModel(stationData);
+  byId('forecastCard').hidden = !model;
+  if (!model) {
+    destroyChart('forecastChart');
+    return;
+  }
+  const words = text('forecast');
+  const { labels, glofas, scaling, isScaled, factor, rp2 } = model;
+  // The axis fits the hydrographs and the thresholds. GloFAS's 2-year level is drawn only when it
+  // is near the flows; otherwise the subtitle gives its value.
+  const flows = [...model.observedDischarge, ...model.forecastDischarge, ...(isScaled ? model.rawForecast : [])].filter(isFiniteNumber);
+  const flowPeak = flows.length ? Math.max(...flows) : null;
+  const showRp2 = Number.isFinite(rp2) && flowPeak != null && rp2 <= 1.5 * flowPeak;
+  const thresholdLines = forecastThresholdLines(model.dischargeThresholds);
+  const range = niceAxisRange([...flows, ...(showRp2 ? [rp2] : []), ...thresholdLines.flatMap((line) => line.data)]);
+
+  byId('forecastTitle').textContent = words.titleDischarge;
+  byId('forecastSubtitle').textContent = [
+    `${words.issued} ${formatDate(glofas.issued)}, 00:00 UTC`,
+    isScaled
+      ? words.scaled(formatNumber(factor, 2), scaling.n_days, formatDate(scaling.window[0]), formatDate(scaling.window[1]))
+      : words.notScaled[scaling.status](scaling.factor == null ? null : formatNumber(Number(scaling.factor), 2)),
+    ...(Number.isFinite(rp2) && !showRp2 ? [words.levelAbove(GLOFAS_LEVEL.years, formatNumber(Math.round(rp2)))] : []),
+  ].join(' · ');
+  // Static, trusted text from TEXT; no station data goes into this markup.
+  byId('forecastNote').innerHTML = `${model.hasTelemetry ? '' : `${words.noTelemetry} `}${words.note} ${words.officialLinks}`;
+
+  destroyChart('forecastChart');
+  state.charts.forecastChart = new Chart(byId('forecastChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        ...(model.observedDischarge.some(isFiniteNumber) ? [{
+          label: words.observedDischarge,
+          data: model.observedDischarge,
+          borderColor: CHART_THEME.discharge,
+          pointRadius: 0,
+          borderWidth: 2.35,
+          tension: 0.12,
+        }] : []),
+        {
+          label: isScaled ? words.scaledForecast(formatNumber(factor, 2)) : words.glofas,
+          data: model.forecastDischarge,
+          borderColor: CURVE_COLORS[7],
+          pointRadius: 0,
+          borderWidth: isScaled ? 2.6 : 2.2,
+          borderDash: isScaled ? [] : [8, 4],
+          tension: 0.12,
+        },
+        ...(isScaled ? [{
+          label: words.rawForecast,
+          data: model.rawForecast,
+          borderColor: 'rgba(102, 58, 112, 0.38)',
+          pointRadius: 0,
+          borderWidth: 1.4,
+          borderDash: [5, 4],
+          tension: 0.12,
+        }] : []),
+        ...(showRp2 ? [{
+          label: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
+          data: labels.map((date) => (model.forecastDates.has(date) ? rp2 : null)),
+          borderColor: GLOFAS_LEVEL.color,
+          pointRadius: 0,
+          borderWidth: 1.2,
+          borderDash: [2, 4],
+          thresholdLabel: isScaled ? words.scaledLevel(GLOFAS_LEVEL.years) : words.level(GLOFAS_LEVEL.years),
+          directLabel: true,
+        }] : []),
+        ...thresholdLines,
+      ],
+    },
+    options: forecastChartOptions(model, words, words.discharge, range),
+  });
+}
+
+function renderForecastStageChart(stationData) {
+  const model = currentForecastModel(stationData);
+  const visible = Boolean(model) && forecastStageAvailable(model);
+  byId('forecastStageCard').hidden = !visible;
+  if (!visible) {
+    destroyChart('forecastStageChart');
+    return;
+  }
+  const words = text('forecast');
+  const thresholdLines = forecastThresholdLines(model.stageThresholds);
+  const range = niceAxisRange([...model.observedStage, ...model.forecastStage, ...thresholdLines.flatMap((line) => line.data)]);
+  byId('forecastStageTitle').textContent = words.titleStage;
+  byId('forecastStageSubtitle').textContent = [
+    `${words.issued} ${formatDate(model.glofas.issued)}, 00:00 UTC`,
+    model.isScaled ? words.stageFromScaled : words.stageFromRaw,
+  ].join(' · ');
+
+  destroyChart('forecastStageChart');
+  state.charts.forecastStageChart = new Chart(byId('forecastStageChart'), {
+    type: 'line',
+    data: {
+      labels: model.labels,
+      datasets: [
+        ...(model.observedStage.some(isFiniteNumber) ? [{
+          label: words.observedStage,
+          data: model.observedStage,
+          borderColor: CHART_THEME.stage,
+          pointRadius: 0,
+          borderWidth: 2.35,
+          tension: 0.12,
+        }] : []),
+        ...(model.forecastStage.some(isFiniteNumber) ? [{
+          label: words.forecastStage,
+          data: model.forecastStage,
+          borderColor: CURVE_COLORS[7],
+          pointRadius: 0,
+          borderWidth: 2.6,
+          tension: 0.12,
+          spanGaps: false,
+        }] : []),
+        ...thresholdLines,
+      ],
+    },
+    options: forecastChartOptions(model, words, words.stage, range, CHART_THEME.stage),
+  });
+}
 
 function renderStationCharts(stationData, eager = false) {
   state.chartObserver?.disconnect();
@@ -3405,23 +4053,17 @@ function renderTimeseriesChart(stationData) {
   canvas.hidden = false;
   emptyNode.hidden = true;
   const valueType = stationData.summary.threshold_value_type;
-  const latestCurve = valueType === 'stage_cm' ? latestRatingCurve(stationData) : null;
+  const curves = valueType === 'stage_cm' ? (stationData.hydraulic?.ratingCurves || []) : [];
   const labels = rows.map((row) => row.date);
   const values = rows.map((row) => row.observed_value);
-  const derivedDischarge = latestCurve
-    ? rows.map((row) => {
-      if (!isFiniteNumber(row.observed_value)) return null;
-      const stage = Number(row.observed_value);
-      const withinCurveBounds = (
-        !isFiniteNumber(latestCurve.stageMin)
-        || !isFiniteNumber(latestCurve.stageMax)
-        || (stage >= Number(latestCurve.stageMin) && stage <= Number(latestCurve.stageMax))
-      );
-      if (!withinCurveBounds) return null;
-      return ratingDischarge(stage, latestCurve.coefficientA, latestCurve.coefficientH0, latestCurve.coefficientN);
-    })
-    : [];
-  const hasDerivedDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
+  // Days without a curve valid on the date use the most recent curve, as the threshold
+  // pipeline does, and are drawn as a separate, dotted series.
+  const estimates = curves.length ? rows.map((row) => validCurveDischarge(curves, row.date, row.observed_value)) : [];
+  const derivedDischarge = estimates.map((estimate) => (estimate.validOnDate ? estimate.discharge : null));
+  const fallbackDischarge = estimates.map((estimate) => (estimate.validOnDate === false ? estimate.discharge : null));
+  const hasValidDischarge = derivedDischarge.some((value) => isFiniteNumber(value));
+  const hasFallbackDischarge = fallbackDischarge.some((value) => isFiniteNumber(value));
+  const hasDerivedDischarge = hasValidDischarge || hasFallbackDischarge;
   const normalizedThresholdRows = rows.map((row) => {
     const interval = findIntervalForDate(stationData, row.date);
     return normalizeThresholdTriplet(
@@ -3434,6 +4076,7 @@ function renderTimeseriesChart(stationData) {
   const flood = normalizedThresholdRows.map((row) => row.flood);
   const severe = normalizedThresholdRows.map((row) => row.severe);
   const highlightValue = values[labels.indexOf(state.selectedDate)];
+  const provisionalLabelRuns = provisionalRuns(rows.map((row) => row.provisional)).map(([start, end]) => [labels[start], labels[end]]);
 
   destroyChart('timeseriesChart');
   const ctx = canvas;
@@ -3494,10 +4137,10 @@ function renderTimeseriesChart(stationData) {
           pointBorderColor: '#fff',
           pointBorderWidth: 1.5,
         },
-        ...(latestCurve && hasDerivedDischarge ? [{
+        ...(hasValidDischarge ? [{
           label: state.lang === 'pt'
-            ? `Vazão estimada pela curva-chave mais recente (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`
-            : `Estimated discharge from the latest rating curve (${formatShortDate(latestCurve.validTo || latestCurve.validFrom)})`,
+            ? 'Vazão estimada pela curva-chave válida na data'
+            : 'Estimated discharge, rating curve valid on the date',
           data: derivedDischarge,
           yAxisID: 'yDischarge',
           borderColor: CHART_THEME.discharge,
@@ -3506,7 +4149,20 @@ function renderTimeseriesChart(stationData) {
           borderWidth: 2,
           borderDash: [8, 4],
           tension: 0.08,
-          spanGaps: true,
+          spanGaps: false,
+        }] : []),
+        ...(hasFallbackDischarge ? [{
+          label: state.lang === 'pt'
+            ? 'Vazão estimada pela curva-chave mais recente (sem curva válida na data)'
+            : 'Estimated discharge, most recent rating curve (none valid on the date)',
+          data: fallbackDischarge,
+          yAxisID: 'yDischarge',
+          borderColor: 'rgba(38, 139, 136, 0.55)',
+          pointRadius: 0,
+          borderWidth: 2,
+          borderDash: [2, 4],
+          tension: 0.08,
+          spanGaps: false,
         }] : []),
       ],
     },
@@ -3524,26 +4180,31 @@ function renderTimeseriesChart(stationData) {
           },
         }),
         thresholdLabels: { enabled: true },
+        provisionalShade: { runs: provisionalLabelRuns, label: text('provisionalSeries') },
         selectedDateLine: { value: state.selectedDate },
       }),
       scales: {
         x: chartScale({ maxTicksLimit: 8 }),
         y: chartScale({ title: TEXT[state.lang].units[valueType] }),
-        ...(latestCurve && hasDerivedDischarge ? {
+        ...(hasDerivedDischarge ? {
           yDischarge: {
             ...chartScale({
               title: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)',
               position: 'right',
               tickColor: CHART_THEME.discharge,
             }),
-            grid: { drawOnChartArea: false },
+            grid: { ...chartScale().grid, drawOnChartArea: false },
             title: { display: true, text: state.lang === 'pt' ? 'Vazão estimada (m³/s)' : 'Estimated discharge (m³/s)', color: CHART_THEME.discharge, font: { size: 12, weight: '600' } },
           },
         } : {}),
       },
     },
   });
-  byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}`;
+  // Say so when some plotted days have no rating curve valid on the date.
+  const noValidCurve = hasFallbackDischarge
+    ? ` · ${state.lang === 'pt' ? 'parte da vazão usa a curva-chave mais recente' : 'part of the discharge uses the most recent rating curve'}`
+    : '';
+  byId('timeseriesSubtitle').textContent = `${thresholdTypeLabel(valueType)} · ${seriesRangeLabel(state.currentRange)}${noValidCurve}`;
 }
 
 function renderCrossSectionChart(stationData) {
@@ -4064,6 +4725,71 @@ function renderSeasonality(stationData) {
   });
 }
 
+function crossSectionTableRows(stationData) {
+  return (stationData.hydraulic?.crossSections || [])
+    .map((section) => ({ date: section.date, id: section.id, ...section.geometry }))
+    .sort((left, right) => String(left.date || '').localeCompare(String(right.date || '')));
+}
+
+function ratingTableRows(stationData) {
+  return (stationData.hydraulic?.ratingCurves || [])
+    .map((curve) => ({ ...curve, ...parseRatingSegmentId(curve.segmentId) }))
+    .sort((left, right) => String(left.validFrom || '').localeCompare(String(right.validFrom || ''))
+      || String(left.curveId || '').localeCompare(String(right.curveId || ''))
+      || (left.segment || 0) - (right.segment || 0));
+}
+
+const coefficientFormat = (value) => formatNumber(value, Math.min(4, (String(value).split('.')[1] || '').length));
+
+function consistencyLabel(level) {
+  if (level === 2) return text('consistencyChecked');
+  if (level === 1) return text('consistencyRaw');
+  return '-';
+}
+
+function segmentLabel(row) {
+  return row.segment ? `${row.segment} ${text('segmentOf')} ${row.segments}` : '-';
+}
+
+function renderHydraulicTables(stationData) {
+  const sectionBody = byId('crossSectionTableBody');
+  if (sectionBody) {
+    const rows = crossSectionTableRows(stationData);
+    const cm = (value) => (value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(value, 0));
+    sectionBody.innerHTML = rows.length
+      ? rows.map((row) => `<tr><td>${formatShortDate(row.date)}</td><td>${cm(row.thalweg)}</td><td>${cm(row.leftBank)}</td><td>${cm(row.rightBank)}</td><td>${row.bankfull == null ? `- <small>(${text('noBankfull')})</small>` : cm(row.bankfull)}</td><td>${cm(row.depth)}</td></tr>`).join('')
+      : '<tr><td colspan="6">-</td></tr>';
+  }
+  const ratingBody = byId('ratingTableBody');
+  if (ratingBody) {
+    const rows = ratingTableRows(stationData);
+    ratingBody.innerHTML = rows.length
+      ? rows.map((row) => {
+        const equation = ratingEquationParts(row.coefficientA, row.coefficientH0, row.coefficientN, coefficientFormat);
+        return `<tr><td>${formatShortDate(row.validFrom)}</td><td>${row.validTo ? formatShortDate(row.validTo) : text('openEnded')}</td><td>${segmentLabel(row)}</td><td>${consistencyLabel(row.consistencyLevel)}</td><td>${formatNumber(row.stageMin, 0)}–${formatNumber(row.stageMax, 0)}</td><td>${equation.base}<sup>${equation.exponent}</sup></td></tr>`;
+      }).join('')
+      : '<tr><td colspan="6">-</td></tr>';
+  }
+}
+
+function crossSectionTableCsvRows(stationData) {
+  return [
+    ['survey_date', 'cross_section_id', 'thalweg_cm', 'left_bank_cm', 'right_bank_cm', 'bankfull_stage_cm', 'depth_thalweg_to_bankfull_cm', 'bankfull_flags'],
+    ...crossSectionTableRows(stationData).map((row) => [row.date, row.id, row.thalweg, row.leftBank, row.rightBank, row.bankfull, row.depth, row.flags || '']),
+  ];
+}
+
+function ratingTableCsvRows(stationData) {
+  return [
+    ['valid_from', 'valid_to', 'rating_curve_id', 'rating_curve_segment_id', 'segment', 'segments', 'consistency_level', 'stage_min_cm', 'stage_max_cm', 'coefficient_a', 'coefficient_h0_m', 'coefficient_n', 'equation'],
+    ...ratingTableRows(stationData).map((row) => [
+      row.validFrom, row.validTo, row.curveId, row.segmentId, row.segment, row.segments, row.consistencyLevel,
+      row.stageMin, row.stageMax, row.coefficientA, row.coefficientH0, row.coefficientN,
+      `Q = ${row.coefficientA} * (H - ${row.coefficientH0})^${row.coefficientN}`,
+    ]),
+  ];
+}
+
 function renderEventsTable(stationData) {
   const body = byId('eventTableBody');
   body.innerHTML = '';
@@ -4179,6 +4905,7 @@ function renderEmptySelection() {
   byId('qaFlags').innerHTML = '';
   byId('eventMetrics').innerHTML = '';
   byId('eventTableBody').innerHTML = '';
+  ['crossSectionTableBody', 'ratingTableBody'].forEach((id) => { if (byId(id)) byId(id).innerHTML = ''; });
   byId('crossSectionChart').hidden = true;
   byId('crossSectionEmpty').hidden = true;
   destroyChart('crossSectionChart');
@@ -4216,12 +4943,18 @@ async function selectStation(stationCode) {
   setRegionLoading('station', true);
   setAppProgress(72, text('loadingStation'), true);
   try {
-    const data = await loadStationData(stationCode);
+    const [data, forecast] = await Promise.all([loadStationData(stationCode), loadForecast(stationCode)]);
     state.selectedData = data;
+    state.selectedForecast = forecast;
+    // Shown before the charts render: the lazy renderer only sees cards that are on screen.
+    const forecastModel = forecast ? buildForecastModel(data, forecast) : null;
+    byId('forecastCard').hidden = !forecastModel;
+    byId('forecastStageCard').hidden = !(forecastModel && forecastStageAvailable(forecastModel));
     renderStatusCard(data);
     renderMetadata(data);
     renderEventSummary(data);
     renderEventsTable(data);
+    renderHydraulicTables(data);
     renderQaSection(data);
     renderStationCharts(data);
     telemetry.measure('station.loaded', startedAt, {
@@ -4325,6 +5058,12 @@ function buildCsv(rows) {
   return rows
     .map((row) => row.map((value) => `"${String(normalizeCsvValue(value)).replaceAll('"', '""')}"`).join(','))
     .join('\n');
+}
+
+// Station files are named by code and name, for example limiar_station_83250000_ITUPORANGA.
+function stationFileStem(stationData) {
+  const name = fileNamePart(stationData.metadata.station_name);
+  return `limiar_station_${stationData.metadata.station_code}${name ? `_${name}` : ''}`;
 }
 
 function downloadBlob(blob, filename) {
@@ -4489,7 +5228,7 @@ function stationMetadataCsvRows(stationData) {
 }
 
 function dailySeriesCsvRows(stationData) {
-  const latestCurve = stationData.summary.threshold_value_type === 'stage_cm' ? latestRatingCurve(stationData) : null;
+  const curves = stationData.summary.threshold_value_type === 'stage_cm' ? (stationData.hydraulic?.ratingCurves || []) : [];
   const rows = [[
     'date',
     'observed_value',
@@ -4504,7 +5243,10 @@ function dailySeriesCsvRows(stationData) {
     'threshold_source',
     'interval_start',
     'interval_end',
-    'estimated_discharge_latest_curve_m3s',
+    'estimated_discharge_m3s',
+    'rating_curve_segment_id',
+    'rating_curve_valid_on_date',
+    'ana_consistency',
   ]];
   stationData.dailyRows.forEach((row) => {
     const interval = findIntervalForDate(stationData, row.date);
@@ -4513,9 +5255,8 @@ function dailySeriesCsvRows(stationData) {
       interval ? interval.flood : stationData.summary.threshold_value,
       interval ? interval.severe : null,
     );
-    const estimatedDischarge = latestCurve && isFiniteNumber(row.observed_value)
-      ? ratingDischarge(row.observed_value, latestCurve.coefficientA, latestCurve.coefficientH0, latestCurve.coefficientN)
-      : null;
+    const estimate = curves.length ? validCurveDischarge(curves, row.date, row.observed_value) : { discharge: null, segment: null, validOnDate: null };
+    const estimatedDischarge = estimate.discharge;
     rows.push([
       row.date,
       row.observed_value,
@@ -4531,6 +5272,9 @@ function dailySeriesCsvRows(stationData) {
       interval?.startDate || '',
       interval?.endDate || '',
       estimatedDischarge,
+      estimate.segment?.segmentId || '',
+      estimate.validOnDate == null ? '' : estimate.validOnDate,
+      !stationData.hasConsistency || row.observed_value == null ? '' : text(row.provisional ? 'csvRaw' : 'csvConsisted'),
     ]);
   });
   return rows;
@@ -4737,17 +5481,19 @@ function seasonalityCsvRows(stationData) {
 }
 
 function buildStationCsvEntries(stationData) {
-  const stationCode = stationData.metadata.station_code;
   const selectedDateSlug = state.selectedDate || 'date';
+  const stem = stationFileStem(stationData);
   const readme = state.lang === 'pt'
     ? [
       'Pacote CSV da estação LIMIAR',
       '',
       'Arquivos incluídos:',
       '- metadata_summary.csv: metadados e resumo da estação na data selecionada.',
-      '- daily_timeseries.csv: série diária com status, limiares e vazão estimada pela curva-chave mais recente.',
+      '- daily_timeseries.csv: série diária com status, limiares e vazão estimada pela curva-chave válida em cada dia (ou a mais recente, quando nenhuma é válida; ver rating_curve_valid_on_date).',
       '- threshold_intervals.csv: intervalos dinâmicos de limiar usados na reconstrução.',
       '- cross_sections.csv: pontos de cada seção transversal plotada.',
+      '- cross_section_surveys.csv: data, talvegue, margens, cota de margens plenas e profundidade de cada levantamento.',
+      '- rating_curve_segments.csv: validade, faixa de cota e equação de cada trecho de curva-chave.',
       '- rating_curve_lines.csv: pontos das curvas-chave plotadas no gráfico.',
       '- rating_curve_threshold_points.csv: pontos dinâmicos de limiar no espaço vazão-cota.',
       '- annual_maxima_thresholds.csv: base do gráfico de máximos anuais e limiares.',
@@ -4759,9 +5505,11 @@ function buildStationCsvEntries(stationData) {
       '',
       'Included files:',
       '- metadata_summary.csv: station metadata and selected-day summary.',
-      '- daily_timeseries.csv: daily series with status, thresholds, and discharge estimated from the latest rating curve.',
+      '- daily_timeseries.csv: daily series with status, thresholds, and discharge estimated with the rating curve valid on each day (or the most recent one when none is valid; see rating_curve_valid_on_date).',
       '- threshold_intervals.csv: dynamic threshold intervals used in the reconstruction.',
       '- cross_sections.csv: points for each plotted cross section.',
+      '- cross_section_surveys.csv: date, thalweg, banks, bankfull stage, and depth of each survey.',
+      '- rating_curve_segments.csv: validity, stage range, and equation of each rating-curve segment.',
       '- rating_curve_lines.csv: points for the rating-curve chart.',
       '- rating_curve_threshold_points.csv: dynamic threshold points in discharge-stage space.',
       '- annual_maxima_thresholds.csv: data behind the annual-maxima and threshold chart.',
@@ -4769,23 +5517,25 @@ function buildStationCsvEntries(stationData) {
       '- seasonality.csv: monthly counts of event starts and peaks.',
     ].join('\n');
   return [
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/README.txt`, text: readme },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/metadata_summary.csv`, text: buildCsv(stationMetadataCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/daily_timeseries.csv`, text: buildCsv(dailySeriesCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/threshold_intervals.csv`, text: buildCsv(thresholdIntervalsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/cross_sections.csv`, text: buildCsv(crossSectionsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_lines.csv`, text: buildCsv(ratingCurveLinesCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/rating_curve_threshold_points.csv`, text: buildCsv(ratingCurveThresholdPointsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/annual_maxima_thresholds.csv`, text: buildCsv(annualEvidenceCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/events_reconstructed.csv`, text: buildCsv(eventsCsvRows(stationData)) },
-    { name: `limiar_station_${stationCode}_${selectedDateSlug}/seasonality.csv`, text: buildCsv(seasonalityCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/README.txt`, text: readme },
+    { name: `${stem}_${selectedDateSlug}/metadata_summary.csv`, text: buildCsv(stationMetadataCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/daily_timeseries.csv`, text: buildCsv(dailySeriesCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/threshold_intervals.csv`, text: buildCsv(thresholdIntervalsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/cross_sections.csv`, text: buildCsv(crossSectionsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/cross_section_surveys.csv`, text: buildCsv(crossSectionTableCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_segments.csv`, text: buildCsv(ratingTableCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_lines.csv`, text: buildCsv(ratingCurveLinesCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/rating_curve_threshold_points.csv`, text: buildCsv(ratingCurveThresholdPointsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/annual_maxima_thresholds.csv`, text: buildCsv(annualEvidenceCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/events_reconstructed.csv`, text: buildCsv(eventsCsvRows(stationData)) },
+    { name: `${stem}_${selectedDateSlug}/seasonality.csv`, text: buildCsv(seasonalityCsvRows(stationData)) },
   ];
 }
 
 function exportStationDataPackage() {
   if (!state.selectedData) return;
   const entries = buildStationCsvEntries(state.selectedData);
-  downloadBlob(buildZipBlob(entries), `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}.zip`);
+  downloadBlob(buildZipBlob(entries), `${stationFileStem(state.selectedData)}_${state.selectedDate}.zip`);
   showToast(TEXT[state.lang].toasts.stationDataReady);
 }
 
@@ -4851,13 +5601,15 @@ const STATION_CSV_EXPORTS = {
   exportEvidenceCsvButton: { slug: 'annual_evidence', rows: annualEvidenceCsvRows },
   exportSeasonalityCsvButton: { slug: 'seasonality', rows: seasonalityCsvRows },
   exportEventsCsvButton: { slug: 'events', rows: eventsCsvRows },
+  exportCrossSectionTableCsvButton: { slug: 'cross_section_surveys', rows: crossSectionTableCsvRows },
+  exportRatingTableCsvButton: { slug: 'rating_curve_segments', rows: ratingTableCsvRows },
 };
 
 function exportStationCsv(kind) {
   if (!state.selectedData) return;
   const config = STATION_CSV_EXPORTS[kind];
   if (!config) return;
-  const filename = `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}_${config.slug}.csv`;
+  const filename = `${stationFileStem(state.selectedData)}_${state.selectedDate}_${config.slug}.csv`;
   downloadBlob(
     new Blob([buildCsv(config.rows(state.selectedData))], { type: 'text/csv;charset=utf-8' }),
     filename,
@@ -4898,6 +5650,8 @@ async function buildQaPanelPartImages(src) {
   return Promise.all(QA_PANEL_PARTS.map(async (panel) => ({
     ...panel,
     title: qaPanelPartLabel(panel.key),
+    naturalWidth: halfWidth,
+    naturalHeight: halfHeight,
     bytes: await cropImageRectToBytes(
       image,
       panel.col * halfWidth,
@@ -4917,15 +5671,41 @@ const REPORT_THEME = {
   border: 'D2C4AF',
 };
 
+const REPORT_FONT = { body: 'Helvetica Light', bold: 'Helvetica' };
+
+// Word sizes are in half-points.
+const REPORT_SIZE = {
+  title: 44,
+  subtitle: 28,
+  heading: 32,
+  subheading: 26,
+  body: 22,
+  table: 20,
+  caption: 20,
+  running: 18,
+};
+
+const REPORT_FIGURE_WIDTH_PT = Math.min(450, reportTextWidthPt());
+const REPORT_FIGURES = {
+  timeseriesChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  crossSectionChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 330),
+  dynamicDailyChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  ratingCurveChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 340),
+  evidenceChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 290),
+  seasonalityChart: reportFigureLayout(REPORT_FIGURE_WIDTH_PT, 260),
+};
+
 function reportRun(text, options = {}) {
   const docx = window.docx;
   return new docx.TextRun({
     text: text == null ? '' : String(text),
     bold: Boolean(options.bold),
     italics: Boolean(options.italics),
+    subScript: Boolean(options.subScript),
+    superScript: Boolean(options.superScript),
     color: options.color || REPORT_THEME.text,
-    size: options.size || 26,
-    font: options.font || 'Aptos',
+    size: options.size || REPORT_SIZE.body,
+    font: options.bold ? REPORT_FONT.bold : REPORT_FONT.body,
   });
 }
 
@@ -4933,11 +5713,15 @@ function reportParagraph(text, options = {}) {
   const docx = window.docx;
   return new docx.Paragraph({
     alignment: options.alignment,
-    pageBreakBefore: options.pageBreakBefore,
+    heading: options.heading,
+    bullet: options.bullet,
+    keepNext: options.keepNext,
+    tabStops: options.tabStops,
+    border: options.border,
     spacing: {
       before: options.before || 0,
-      after: options.after ?? 140,
-      line: options.line || 340,
+      after: options.after ?? 120,
+      line: options.line || 276,
     },
     children: Array.isArray(options.children) && options.children.length
       ? options.children
@@ -4949,51 +5733,267 @@ function reportCell(text, options = {}) {
   const docx = window.docx;
   return new docx.TableCell({
     shading: options.fill ? { fill: options.fill } : undefined,
+    width: options.width ? { size: options.width, type: docx.WidthType.DXA } : undefined,
     margins: {
-      top: 90,
-      bottom: 90,
+      top: 80,
+      bottom: 80,
       left: 110,
       right: 110,
     },
     children: [
       reportParagraph(text, {
-        size: options.size || 26,
+        size: options.size || REPORT_SIZE.table,
         bold: options.bold,
         color: options.color || REPORT_THEME.text,
         after: 0,
-        line: 300,
+        line: 260,
+        children: options.runs,
       }),
     ],
   });
 }
 
+function reportTable(rows, columnWidths) {
+  const docx = window.docx;
+  return new docx.Table({
+    width: { size: columnWidths.reduce((sum, value) => sum + value, 0), type: docx.WidthType.DXA },
+    columnWidths,
+    layout: docx.TableLayoutType.FIXED,
+    rows,
+  });
+}
+
+function reportRunningParagraph(left, right, borderSide) {
+  const docx = window.docx;
+  const size = REPORT_SIZE.running;
+  return reportParagraph('', {
+    after: 0,
+    line: 240,
+    tabStops: [{ type: docx.TabStopType.RIGHT, position: REPORT_PAGE.width - 2 * REPORT_PAGE.margin }],
+    border: {
+      [borderSide]: { style: docx.BorderStyle.SINGLE, size: 4, color: REPORT_THEME.border, space: 4 },
+    },
+    children: [
+      reportRun(left, { size, color: REPORT_THEME.muted }),
+      new docx.TextRun({ children: [new docx.Tab()] }),
+      ...right,
+    ],
+  });
+}
+
+function reportSection(sectionTitle, footerText, children) {
+  const docx = window.docx;
+  const pageText = TEXT[state.lang].report.page;
+  const pageRun = new docx.TextRun({
+    size: REPORT_SIZE.running,
+    color: REPORT_THEME.muted,
+    font: REPORT_FONT.body,
+    children: [`${pageText.label} `, docx.PageNumber.CURRENT, ` ${pageText.of} `, docx.PageNumber.TOTAL_PAGES],
+  });
+  return {
+    properties: {
+      page: {
+        size: { width: REPORT_PAGE.width, height: REPORT_PAGE.height },
+        margin: {
+          top: REPORT_PAGE.margin,
+          right: REPORT_PAGE.margin,
+          bottom: REPORT_PAGE.margin,
+          left: REPORT_PAGE.margin,
+          header: REPORT_PAGE.headerFooter,
+          footer: REPORT_PAGE.headerFooter,
+        },
+      },
+    },
+    headers: {
+      default: new docx.Header({
+        children: [
+          reportRunningParagraph(`LIMIAR · ${TEXT[state.lang].report.title}`, [
+            reportRun(sectionTitle, { size: REPORT_SIZE.running, bold: true, color: REPORT_THEME.accent }),
+          ], 'bottom'),
+        ],
+      }),
+    },
+    footers: {
+      default: new docx.Footer({
+        children: [reportRunningParagraph(footerText, [pageRun], 'top')],
+      }),
+    },
+    children,
+  };
+}
+
+// Text such as 'H_{bf}' becomes H with a subscript bf.
+function reportRichRuns(value, options = {}) {
+  return String(value).split(/(_\{[^}]*\})/).filter(Boolean).map((part) => {
+    const subscript = part.match(/^_\{([^}]*)\}$/);
+    return subscript ? reportRun(subscript[1], { ...options, subScript: true }) : reportRun(part, options);
+  });
+}
+
+function reportEquation(children) {
+  const docx = window.docx;
+  return new docx.Paragraph({
+    alignment: docx.AlignmentType.CENTER,
+    keepNext: true,
+    spacing: { before: 40, after: 100 },
+    children: [new docx.Math({ children })],
+  });
+}
+
+function reportMethodEquations() {
+  const docx = window.docx;
+  const run = (value) => new docx.MathRun(value);
+  const sub = (base, index) => new docx.MathSubScript({ children: [run(base)], subScript: [run(index)] });
+  const fraction = (numerator, denominator) => new docx.MathFraction({ numerator, denominator });
+  const eulerGamma = state.lang === 'pt' ? '0,5772' : '0.5772';
+  return {
+    bankfull: [
+      sub('Q', 'bf'),
+      run('=a'),
+      new docx.MathSuperScript({ children: [run('('), sub('H', 'bf'), run('−'), sub('h', '0'), run(')')], superScript: [run('n')] }),
+    ],
+    gumbelFit: [
+      run('β='),
+      fraction([sub('s', 'M'), new docx.MathRadical({ children: [run('6')] })], [run('π')]),
+      run(`,  μ=M̄−${eulerGamma}β`),
+    ],
+    gumbelQuantile: [sub('Q', 'T'), run('=μ−β ln[−ln(1−'), fraction([run('1')], [run('T')]), run(')]')],
+    inverseRating: [
+      run('H='),
+      sub('h', '0'),
+      run('+'),
+      new docx.MathSuperScript({ children: [run('('), fraction([run('Q')], [run('a')]), run(')')], superScript: [fraction([run('1')], [run('n')])] }),
+    ],
+  };
+}
+
+function reportMethodsChildren(heading, subheading, stationData) {
+  const methods = TEXT[state.lang].report.methods;
+  const observedDays = stationData.dailyRows.filter((row) => row.observed_value != null).length;
+  const rawDays = stationData.dailyRows.filter((row) => row.provisional).length;
+  const equations = reportMethodEquations();
+  const prose = (value) => reportParagraph('', { children: reportRichRuns(value), after: 100 });
+  const bullet = (value) => reportParagraph('', { children: reportRichRuns(value), bullet: { level: 0 }, after: 60 });
+  return [
+    heading(methods.title),
+    prose(methods.intro),
+    subheading(methods.thresholdHeading),
+    prose(methods.thresholdText),
+    reportEquation(equations.bankfull),
+    prose(methods.thresholdAfter),
+    subheading(methods.statHeading),
+    prose(methods.statText),
+    reportEquation(equations.gumbelFit),
+    reportEquation(equations.gumbelQuantile),
+    prose(methods.statAfter),
+    subheading(methods.classesHeading),
+    prose(methods.classesText),
+    ...methods.classes.map(bullet),
+    prose(methods.classesAfter),
+    reportEquation(equations.inverseRating),
+    prose(methods.classesNote),
+    subheading(methods.eventsHeading),
+    prose(methods.eventsText),
+    subheading(methods.uncertaintyHeading),
+    ...methods.uncertainty.map(bullet),
+    ...(rawDays ? [bullet(methods.provisional(
+      formatNumber(rawDays),
+      formatNumber(observedDays),
+      formatPercent(rawDays / observedDays, 1),
+      formatDate(stationData.summary.consisted_through),
+    ))] : []),
+  ];
+}
+
+const REPORT_TIMESERIES_RANGES = ['30', '90', 'full'];
+
+// The data and options of an on-screen chart, as the native Word chart needs them.
+function chartJsSource(chartKey) {
+  const chart = state.charts[chartKey];
+  if (!chart) return null;
+  const options = chart.config._config.options || {};
+  const datasets = [...chart.data.datasets];
+  // The shaded threshold band is drawn by a plugin; in Word it becomes three lines.
+  const band = options.plugins?.thresholdBand;
+  const xs = datasets.flatMap((dataset) => (dataset.data || []).map((point) => Number(point?.x))).filter(Number.isFinite);
+  if (band?.enabled && xs.length) {
+    const labels = TEXT[state.lang].report.bandLabels;
+    const line = (key, value, color, dash) => ({
+      label: labels[key],
+      data: [{ x: Math.min(...xs), y: value }, { x: Math.max(...xs), y: value }],
+      borderColor: color,
+      borderDash: dash,
+      borderWidth: 1.4,
+    });
+    datasets.push(
+      line('low', band.low, 'rgba(208, 75, 69, 0.7)', [2, 3]),
+      line('median', band.median, '#8f1d21', [7, 4]),
+      line('high', band.high, 'rgba(208, 75, 69, 0.7)', [2, 3]),
+    );
+  }
+  return { type: chart.config.type, labels: chart.data.labels || [], datasets, options };
+}
+
+function safeChartModel(source) {
+  try {
+    return source ? chartModelFromChartJs(source) : null;
+  } catch (error) {
+    console.warn('Could not prepare a native chart.', error);
+    return null;
+  }
+}
+
+function timeseriesReportCaption() {
+  const report = TEXT[state.lang].report;
+  // The discharge axis is drawn only when some plotted stages can be converted.
+  return state.charts.timeseriesChart?.scales?.yDischarge
+    ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia; sem curva válida na data, usa-se a mais recente (linha pontilhada).' : 'The right axis shows discharge estimated with the rating curve valid on each day; where none is valid on the date, the most recent curve is used (dotted line).'}`
+    : report.chartCaption;
+}
+
+// Every chart in the report, as a native chart model and as a PNG for the fallback.
+async function collectReportFigures() {
+  const report = TEXT[state.lang].report;
+  const figures = [];
+  const add = async (chartKey, title, caption, dateFormat = 'yyyy') => {
+    const source = chartJsSource(chartKey);
+    if (!source) return;
+    figures.push({
+      index: figures.length + 1,
+      title,
+      caption,
+      dateFormat,
+      layout: REPORT_FIGURES[chartKey],
+      model: safeChartModel(source),
+      bytes: await safeChartToBytes(chartKey, REPORT_FIGURES[chartKey]),
+    });
+  };
+  for (const range of REPORT_TIMESERIES_RANGES) {
+    state.currentRange = range;
+    renderTimeseriesChart(state.selectedData);
+    await add('timeseriesChart', `${report.chartSection} · ${report.windows[range]}`, timeseriesReportCaption(), range === 'full' ? 'yyyy' : 'yyyy-mm-dd');
+  }
+  await add('crossSectionChart', report.crossSectionSection, report.crossSectionCaption);
+  await add('dynamicDailyChart', report.dynamicDailySection, report.dynamicDailyCaption);
+  await add('ratingCurveChart', report.ratingCurveSection, report.ratingCurveCaption);
+  await add('evidenceChart', report.evidenceSection, report.evidenceCaption);
+  await add('seasonalityChart', report.seasonalitySection, report.seasonalityCaption);
+  return figures;
+}
+
 async function exportStationReport() {
   if (!state.selectedData || !window.docx) return;
   const previousRange = state.currentRange;
-  let forcedFullRange = false;
   try {
     const docx = window.docx;
-    if (byId('timeseriesChart').hidden) {
-      state.currentRange = 'full';
-      forcedFullRange = true;
-      document.querySelectorAll('.range-button').forEach((node) => {
-        node.classList.toggle('active', node.dataset.range === 'full');
-      });
-      renderTimeseriesChart(state.selectedData);
-    }
     renderStationCharts(state.selectedData, true);
-    const chartBytes = await safeChartToBytes('timeseriesChart', 2800, 1500);
-    const crossSectionBytes = await safeChartToBytes('crossSectionChart', 2600, 1500);
-    const dynamicDailyBytes = await safeChartToBytes('dynamicDailyChart', 2800, 1500);
-    const ratingCurveBytes = await safeChartToBytes('ratingCurveChart', 2600, 1500);
-    const evidenceBytes = await safeChartToBytes('evidenceChart', 2700, 1460);
-    const seasonalityBytes = await safeChartToBytes('seasonalityChart', 2600, 1300);
+    const figures = await collectReportFigures();
     const qaPanelParts = await safeBuildQaPanelPartImages(state.selectedData.qa.panel_png);
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
-    const latestCurve = latestRatingCurve(state.selectedData);
     const docEvents = normalizedEventRows(state.selectedData);
     const qaFlagsText = (state.selectedData.qa.flags || []).length ? state.selectedData.qa.flags.map(flagLabel).join('; ') : text('noQaFlags');
+    const report = TEXT[state.lang].report;
     const summaryPairs = [
       [text('fields').selectedDate, formatDate(state.selectedDate)],
       [text('selectedMetricStatusLabel'), statusLabel(details.status)],
@@ -5011,231 +6011,251 @@ async function exportStationReport() {
       [text('fields').maxDuration, formatDuration(state.selectedData.summary.max_event_duration_days)],
     ];
 
+    const textWidth = REPORT_PAGE.width - 2 * REPORT_PAGE.margin;
+    const summaryColumns = [2513, 2000, 2513, 2000];
+    const eventColumns = [1700, 1700, 1600, 1900, 2126];
     const summaryRows = [];
     for (let index = 0; index < summaryPairs.length; index += 2) {
       const left = summaryPairs[index];
       const right = summaryPairs[index + 1];
       summaryRows.push(new docx.TableRow({
         children: [
-          reportCell(left?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
-          reportCell(left?.[1] || ''),
-          reportCell(right?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent }),
-          reportCell(right?.[1] || ''),
+          reportCell(left?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: summaryColumns[0] }),
+          reportCell(left?.[1] || '', { width: summaryColumns[1] }),
+          reportCell(right?.[0] || '', { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: summaryColumns[2] }),
+          reportCell(right?.[1] || '', { width: summaryColumns[3] }),
         ],
       }));
     }
-    const summaryTable = new docx.Table({ rows: summaryRows });
+    const summaryTable = reportTable(summaryRows, summaryColumns);
 
     const eventsTableRows = [
       new docx.TableRow({
-        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell) => reportCell(cell, {
+        tableHeader: true,
+        children: [text('thStartDate'), text('thPeakDate'), text('thDuration'), text('thPeak'), text('thClass')].map((cell, index) => reportCell(cell, {
           fill: REPORT_THEME.softAccent,
           bold: true,
           color: REPORT_THEME.accent,
+          width: eventColumns[index],
         })),
       }),
       ...(docEvents.length
         ? docEvents.map((event) => new docx.TableRow({
           children: [
-            reportCell(formatShortDate(event.event_start)),
-            reportCell(formatShortDate(event.peak_date)),
-            reportCell(formatDuration(event.duration_days)),
-            reportCell(
-              event.peak_stage_cm != null
-                ? formatValue(event.peak_stage_cm, 'stage_cm')
-                : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
-            ),
-            reportCell(event.display_class),
-          ],
+            formatShortDate(event.event_start),
+            formatShortDate(event.peak_date),
+            formatDuration(event.duration_days),
+            event.peak_stage_cm != null
+              ? formatValue(event.peak_stage_cm, 'stage_cm')
+              : formatValue(event.peak_discharge_m3s, 'discharge_m3s'),
+            event.display_class,
+          ].map((cell, index) => reportCell(cell, { width: eventColumns[index] })),
         }))
         : [new docx.TableRow({
-          children: Array.from({ length: 5 }, (_, index) => reportCell(index === 0 ? '-' : '')),
+          children: eventColumns.map((width, index) => reportCell(index === 0 ? '-' : '', { width })),
         })]),
     ];
 
-    const figureParagraph = (bytes, width, height) => new docx.Paragraph({
+    const heading = (value) => reportParagraph(value, {
+      size: REPORT_SIZE.heading,
+      bold: true,
+      color: REPORT_THEME.accent,
+      heading: docx.HeadingLevel.HEADING_1,
+      keepNext: true,
+      after: 160,
+    });
+
+    const subheading = (value) => reportParagraph(value, {
+      size: REPORT_SIZE.subheading,
+      bold: true,
+      color: REPORT_THEME.accent,
+      heading: docx.HeadingLevel.HEADING_2,
+      keepNext: true,
+      before: 200,
+      after: 80,
+    });
+
+    const figureParagraph = (bytes, size, altText) => new docx.Paragraph({
       alignment: docx.AlignmentType.CENTER,
-      spacing: { after: 120 },
+      keepNext: true,
+      spacing: { before: 60, after: 80 },
       children: [
         new docx.ImageRun({
           data: bytes,
-          transformation: { width, height },
+          transformation: { width: size.imageWidth, height: size.imageHeight },
+          altText: { name: altText, title: altText, description: altText },
         }),
       ],
     });
 
     const figureCaption = (captionText) => reportParagraph(captionText, {
-      size: 26,
+      size: REPORT_SIZE.caption,
       italics: true,
       color: REPORT_THEME.muted,
-      after: 220,
+      after: 200,
     });
 
-    const timeseriesCaption = latestCurve && state.selectedData.summary.threshold_value_type === 'stage_cm'
-      ? `${TEXT[state.lang].report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
-      : TEXT[state.lang].report.chartCaption;
+    // A native chart replaces its placeholder after packing; images are the fallback.
+    const figureBlock = (figure, useNative) => {
+      if (useNative ? !figure.model : !figure.bytes) return [];
+      return [
+        subheading(figure.title),
+        useNative
+          ? reportParagraph(chartPlaceholder(figure.index), { alignment: docx.AlignmentType.CENTER, keepNext: true })
+          : figureParagraph(figure.bytes, figure.layout, figure.title),
+        figureCaption(figure.caption),
+      ];
+    };
 
-    const doc = new docx.Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              margin: { top: 720, right: 720, bottom: 720, left: 720 },
-            },
-          },
+    const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;
+    const footerText = `${state.selectedData.metadata.station_name} (${state.selectedData.metadata.station_code}) · ${formatDate(state.selectedDate)}`;
+
+    // Rating-curve segments and cross-section surveys, as on the station page.
+    const hydraulicTables = () => {
+      const headerCells = (labels, widths) => new docx.TableRow({
+        tableHeader: true,
+        children: labels.map((label, index) => reportCell(label, { fill: REPORT_THEME.softAccent, bold: true, color: REPORT_THEME.accent, width: widths[index] })),
+      });
+      const cm = (value) => (value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(value, 0));
+      const ratingWidths = [1250, 1250, 800, 1300, 1600, 2826];
+      const ratingRows = ratingTableRows(state.selectedData).map((row) => {
+        const equation = ratingEquationParts(row.coefficientA, row.coefficientH0, row.coefficientN, coefficientFormat);
+        const size = REPORT_SIZE.table;
+        return new docx.TableRow({
           children: [
-            reportParagraph(TEXT[state.lang].report.title, {
-              size: 40,
-              bold: true,
-              color: REPORT_THEME.accent,
-              after: 80,
-            }),
-            reportParagraph(`${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`, {
-              size: 30,
-              bold: true,
-              after: 50,
-            }),
-            reportParagraph(`${formatDate(state.selectedDate)} · ${statusLabel(details.status)} · ${basisLabel(basisKey)}`, {
-              size: 24,
-              color: REPORT_THEME.muted,
-              after: 220,
-            }),
-            reportParagraph(TEXT[state.lang].report.summarySection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              after: 100,
-            }),
-            summaryTable,
-            reportParagraph(TEXT[state.lang].report.methodSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              before: 180,
-              after: 80,
-            }),
-            new docx.Table({
-              rows: [
-                new docx.TableRow({
-                  children: [
-                    reportCell(TEXT[state.lang].report.methodText, {
-                      fill: REPORT_THEME.soft,
-                      size: 26,
-                    }),
-                  ],
+            formatShortDate(row.validFrom),
+            row.validTo ? formatShortDate(row.validTo) : text('openEnded'),
+            segmentLabel(row),
+            consistencyLabel(row.consistencyLevel),
+            `${formatNumber(row.stageMin, 0)}–${formatNumber(row.stageMax, 0)}`,
+          ].map((cell, index) => reportCell(cell, { width: ratingWidths[index] })).concat(reportCell('', {
+            width: ratingWidths[5],
+            runs: [reportRun(equation.base, { size }), reportRun(equation.exponent, { size, superScript: true })],
+          })),
+        });
+      });
+      const sectionWidths = [1500, 1400, 1450, 1450, 1600, 1626];
+      const sectionRows = crossSectionTableRows(state.selectedData).map((row) => new docx.TableRow({
+        children: [formatShortDate(row.date), cm(row.thalweg), cm(row.leftBank), cm(row.rightBank), cm(row.bankfull), cm(row.depth)]
+          .map((cell, index) => reportCell(cell, { width: sectionWidths[index] })),
+      }));
+      return [
+        ...(ratingRows.length ? [
+          subheading(text('ratingTableTitle')),
+          reportParagraph(text('ratingTableNote'), { color: REPORT_THEME.muted, size: REPORT_SIZE.caption, after: 80 }),
+          reportTable([headerCells(['thValidFrom', 'thValidTo', 'thSegment', 'thConsistency', 'thStageRange', 'thEquation'].map(text), ratingWidths), ...ratingRows], ratingWidths),
+        ] : []),
+        ...(sectionRows.length ? [
+          subheading(text('crossSectionTableTitle')),
+          reportParagraph(text('crossSectionTableNote'), { color: REPORT_THEME.muted, size: REPORT_SIZE.caption, after: 80 }),
+          reportTable([headerCells(['thSurveyDate', 'thThalweg', 'thLeftBank', 'thRightBank', 'thBankfull', 'thDepth'].map(text), sectionWidths), ...sectionRows], sectionWidths),
+        ] : []),
+      ];
+    };
+
+    const buildDocument = (useNative) => new docx.Document({
+      styles: {
+        default: {
+          document: {
+            run: { font: REPORT_FONT.body, size: REPORT_SIZE.body, color: REPORT_THEME.text },
+          },
+        },
+      },
+      sections: [
+        reportSection(report.summarySection, footerText, [
+          reportParagraph(report.title, {
+            size: REPORT_SIZE.title,
+            bold: true,
+            color: REPORT_THEME.accent,
+            heading: docx.HeadingLevel.TITLE,
+            after: 80,
+          }),
+          reportParagraph(`${state.selectedData.metadata.station_name} · ${state.selectedData.metadata.station_code}`, {
+            size: REPORT_SIZE.subtitle,
+            bold: true,
+            after: 40,
+          }),
+          reportParagraph(`${formatDate(state.selectedDate)} · ${statusLabel(details.status)} · ${basisLabel(basisKey)}`, {
+            color: REPORT_THEME.muted,
+            after: 280,
+          }),
+          heading(report.summarySection),
+          summaryTable,
+          subheading(report.methodSection),
+          reportTable([
+            new docx.TableRow({
+              children: [
+                reportCell(report.methodText, {
+                  fill: REPORT_THEME.soft,
+                  size: REPORT_SIZE.body,
+                  width: textWidth,
                 }),
               ],
             }),
-            reportParagraph(TEXT[state.lang].report.chartSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 90,
-            }),
-            ...(chartBytes ? [
-              figureParagraph(chartBytes, 660, 354),
-              figureCaption(timeseriesCaption),
-            ] : []),
-            ...(crossSectionBytes ? [
-              reportParagraph(TEXT[state.lang].report.crossSectionSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(crossSectionBytes, 660, 381),
-              figureCaption(TEXT[state.lang].report.crossSectionCaption),
-            ] : []),
-            ...(dynamicDailyBytes ? [
-              reportParagraph(TEXT[state.lang].report.dynamicDailySection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(dynamicDailyBytes, 660, 354),
-              figureCaption(TEXT[state.lang].report.dynamicDailyCaption),
-            ] : []),
-            ...(ratingCurveBytes ? [
-              reportParagraph(TEXT[state.lang].report.ratingCurveSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(ratingCurveBytes, 660, 381),
-              figureCaption(TEXT[state.lang].report.ratingCurveCaption),
-            ] : []),
-            ...(evidenceBytes ? [
-              reportParagraph(TEXT[state.lang].report.evidenceSection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(evidenceBytes, 660, 357),
-              figureCaption(TEXT[state.lang].report.evidenceCaption),
-            ] : []),
-            ...(seasonalityBytes ? [
-              reportParagraph(TEXT[state.lang].report.seasonalitySection, {
-                size: 28,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              figureParagraph(seasonalityBytes, 660, 330),
-              figureCaption(TEXT[state.lang].report.seasonalityCaption),
-            ] : []),
-            reportParagraph(TEXT[state.lang].report.qaSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 80,
-            }),
-            reportParagraph(qaFlagsText, {
-              size: 24,
-              color: REPORT_THEME.muted,
-              after: 120,
-            }),
-            ...(qaPanelParts.length ? [
-              figureCaption(TEXT[state.lang].report.qaCaption),
-              reportParagraph(TEXT[state.lang].report.qaSubpanelsSection, {
-                size: 26,
-                bold: true,
-                color: REPORT_THEME.accent,
-                after: 70,
-              }),
-              ...qaPanelParts.flatMap((panel) => [
+          ], [textWidth]),
+        ]),
+        reportSection(report.chartsGroup, footerText, [
+          heading(report.chartsGroup),
+          ...(useNative ? [reportParagraph(report.nativeChartsNote, { color: REPORT_THEME.muted, after: 160 })] : []),
+          ...figures.flatMap((figure) => figureBlock(figure, useNative)),
+        ]),
+        reportSection(report.qaSection, footerText, [
+          heading(report.qaSection),
+          ...hydraulicTables(),
+          reportParagraph(qaFlagsText, {
+            color: REPORT_THEME.muted,
+            after: 120,
+          }),
+          ...(qaPanelParts.length ? [
+            figureCaption(report.qaCaption),
+            subheading(report.qaSubpanelsSection),
+            ...qaPanelParts.flatMap((panel) => {
+              const size = scaleToWidth(panel.naturalWidth, panel.naturalHeight, qaImageWidth);
+              return [
                 reportParagraph(panel.title, {
-                  size: 26,
                   bold: true,
-                  color: REPORT_THEME.text,
+                  keepNext: true,
+                  before: 120,
                   after: 60,
                 }),
-                figureParagraph(panel.bytes, 640, 422),
-              ]),
-            ] : []),
-            reportParagraph(TEXT[state.lang].report.eventsSection, {
-              size: 30,
-              bold: true,
-              color: REPORT_THEME.accent,
-              pageBreakBefore: true,
-              after: 80,
+                figureParagraph(panel.bytes, { imageWidth: size.width, imageHeight: size.height }, panel.title),
+              ];
             }),
-            new docx.Table({
-              rows: eventsTableRows,
-            }),
-          ],
-        },
+          ] : []),
+        ]),
+        reportSection(report.eventsSection, footerText, [
+          heading(report.eventsSection),
+          reportTable(eventsTableRows, eventColumns),
+        ]),
+        reportSection(report.methods.title, footerText, reportMethodsChildren(heading, subheading, state.selectedData)),
       ],
     });
-    const blob = await docx.Packer.toBlob(doc);
+    let blob;
+    try {
+      const packed = await docx.Packer.toBlob(buildDocument(true));
+      const charts = figures.filter((figure) => figure.model).map((figure) => ({
+        index: figure.index,
+        model: figure.model,
+        title: figure.title,
+        widthEmu: figure.layout.imageWidth * 9525,
+        heightEmu: figure.layout.imageHeight * 9525,
+        options: {
+          dateFormat: figure.dateFormat,
+          lang: state.lang === 'pt' ? 'pt-BR' : 'en-US',
+          font: REPORT_FONT.body,
+          boldFont: REPORT_FONT.bold,
+          size: REPORT_MIN_CHART_FONT_PT,
+        },
+      }));
+      blob = await injectNativeCharts(await packed.arrayBuffer(), charts);
+    } catch (error) {
+      console.warn('Could not embed native Word charts; using images instead.', error);
+      blob = await docx.Packer.toBlob(buildDocument(false));
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `limiar_station_${state.selectedData.metadata.station_code}_${state.selectedDate}.docx`;
+    link.download = `${stationFileStem(state.selectedData)}_${state.selectedDate}.docx`;
     link.click();
     URL.revokeObjectURL(url);
     showToast(TEXT[state.lang].toasts.reportReady);
@@ -5243,14 +6263,90 @@ async function exportStationReport() {
     console.error(error);
     showToast(TEXT[state.lang].toasts.reportError);
   } finally {
-    if (forcedFullRange) {
-      state.currentRange = previousRange;
-      document.querySelectorAll('.range-button').forEach((node) => {
-        node.classList.toggle('active', node.dataset.range === previousRange);
-      });
-      renderTimeseriesChart(state.selectedData);
-    }
+    state.currentRange = previousRange;
+    document.querySelectorAll('.range-button').forEach((node) => {
+      node.classList.toggle('active', node.dataset.range === previousRange);
+    });
+    renderTimeseriesChart(state.selectedData);
   }
+}
+
+const MAXIMIZABLE_CHARTS = [
+  'timeseriesChart', 'forecastChart', 'forecastStageChart', 'crossSectionChart', 'dynamicDailyChart', 'ratingCurveChart', 'evidenceChart',
+  'seasonalityChart', 'dailyConditionsChart', 'dailyLatitudeChart', 'dailyLongitudeChart',
+];
+const MAXIMIZE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+
+// Copies Chart.js options without losing callbacks, enlarging every font for the dialog.
+function enlargeChartFonts(value, factor) {
+  if (Array.isArray(value)) return value.map((item) => enlargeChartFonts(item, factor));
+  if (!value || typeof value !== 'object') return value;
+  const copy = {};
+  Object.entries(value).forEach(([key, item]) => {
+    copy[key] = key === 'font' && item && typeof item === 'object' && !Array.isArray(item)
+      ? { ...item, size: Math.round((Number(item.size) || 12) * factor) }
+      : enlargeChartFonts(item, factor);
+  });
+  return copy;
+}
+
+function addChartMaximizeButtons() {
+  MAXIMIZABLE_CHARTS.forEach((chartKey) => {
+    const card = byId(chartKey)?.closest('.chart-card');
+    const head = card?.querySelector('.section-head');
+    if (!head || head.querySelector('.chart-maximize')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chart-maximize';
+    button.dataset.chart = chartKey;
+    button.innerHTML = MAXIMIZE_ICON;
+    button.setAttribute('aria-label', text('maximizeChart'));
+    button.title = text('maximizeChart');
+    button.addEventListener('click', () => openChartOverlay(chartKey, button));
+    (head.querySelector('.section-actions') || head).appendChild(button);
+  });
+}
+
+function translateChartMaximizeButtons() {
+  document.querySelectorAll('.chart-maximize').forEach((button) => {
+    button.setAttribute('aria-label', text('maximizeChart'));
+    button.title = text('maximizeChart');
+  });
+}
+
+function openChartOverlay(chartKey, trigger) {
+  const source = state.charts[chartKey];
+  if (!source) {
+    showToast(text('chartUnavailable'));
+    return;
+  }
+  const card = byId(chartKey).closest('.chart-card');
+  byId('chartOverlayTitle').textContent = card?.querySelector('.section-head h3')?.textContent || '';
+  byId('chartOverlaySubtitle').textContent = card?.querySelector('.section-head span')?.textContent || '';
+  state.chartOverlayTrigger = trigger;
+  openOverlay('chartOverlay');
+  const config = source.config._config;
+  state.chartOverlay?.destroy();
+  // A separate chart with copied data, so the chart on the page is left untouched.
+  state.chartOverlay = new Chart(byId('chartOverlayCanvas'), {
+    type: config.type,
+    data: {
+      labels: [...(source.data.labels || [])],
+      datasets: source.data.datasets.map((dataset) => ({ ...dataset, data: Array.isArray(dataset.data) ? [...dataset.data] : dataset.data })),
+    },
+    options: { ...enlargeChartFonts(config.options || {}, 1.3), responsive: true, maintainAspectRatio: false, animation: false },
+    plugins: config.plugins || [],
+  });
+  byId('closeChartButton').focus();
+}
+
+function closeChartOverlay() {
+  if (byId('chartOverlay')?.hidden) return;
+  closeOverlay('chartOverlay');
+  state.chartOverlay?.destroy();
+  state.chartOverlay = null;
+  state.chartOverlayTrigger?.focus();
+  state.chartOverlayTrigger = null;
 }
 
 function wireEvents() {
@@ -5330,10 +6426,14 @@ function wireEvents() {
   byId('guideSkipButton').addEventListener('click', () => closeGuide(true));
   byId('closeLayersButton').addEventListener('click', () => closeOverlay('layersOverlay'));
   byId('closeImageButton').addEventListener('click', () => closeOverlay('imageOverlay'));
+  byId('closeChartButton').addEventListener('click', closeChartOverlay);
+  addChartMaximizeButtons();
   document.querySelectorAll('[data-overlay-close]').forEach((button) => {
     button.addEventListener('click', () => {
       if (button.dataset.overlayClose === 'theoryOverlay') {
         closeGuide(true);
+      } else if (button.dataset.overlayClose === 'chartOverlay') {
+        closeChartOverlay();
       } else {
         closeOverlay(button.dataset.overlayClose);
       }
@@ -5341,9 +6441,16 @@ function wireEvents() {
   });
   window.addEventListener('keydown', (event) => {
     if (handleGuideKeydown(event)) return;
+    // The chart dialog's only focusable control is its close button, so Tab stays there.
+    if (event.key === 'Tab' && !byId('chartOverlay').hidden) {
+      event.preventDefault();
+      byId('closeChartButton').focus();
+      return;
+    }
     if (event.key !== 'Escape') return;
     closeOverlay('layersOverlay');
     closeOverlay('imageOverlay');
+    closeChartOverlay();
   });
   document.querySelectorAll('.lang-button').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -5359,6 +6466,7 @@ function wireEvents() {
         renderMetadata(state.selectedData);
         renderEventSummary(state.selectedData);
         renderEventsTable(state.selectedData);
+        renderHydraulicTables(state.selectedData);
         renderQaSection(state.selectedData);
         renderStationCharts(state.selectedData);
       } else {
@@ -5426,6 +6534,8 @@ async function boot() {
     state.lang = urlState.lang;
     applyStaticTranslations();
     updateLanguageButtons();
+    // Totals were drawn before the URL language was known; redraw them in that language.
+    renderGlobalStats();
   }
   populateFilters();
   byId('qaFilter').value = 'screening_ok';
