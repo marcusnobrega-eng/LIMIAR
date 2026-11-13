@@ -1319,6 +1319,37 @@ h3 {
   overflow: auto;
 }
 
+/* Long hydraulic tables scroll inside their card with a fixed header. */
+.table-head {
+  margin-top: 18px;
+}
+
+.table-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.table-head span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.table-scroll {
+  max-height: 320px;
+}
+
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-strong);
+}
+
+.hydraulic-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

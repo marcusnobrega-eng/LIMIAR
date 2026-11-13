@@ -164,3 +164,57 @@ export function summarizeDailyStations(rows) {
     stateRanking,
   };
 }
+
+// Bankfull stage of one surveyed profile, following Supplementary Section S3: vertices at the
+// same distance collapse to their median elevation, at least five distinct vertices and two on
+// each side of the thalweg (the lowest vertex) are required, each bank stage is the highest
+// vertex on its side, and bankfull stage is the lower bank, which must lie above the thalweg.
+export function bankfullFromProfile(points) {
+  const byDistance = new Map();
+  (points || []).forEach((point) => {
+    const distance = Number(point?.x);
+    const elevation = Number(point?.y);
+    if (point?.x == null || point?.y == null || !Number.isFinite(distance) || !Number.isFinite(elevation)) return;
+    if (!byDistance.has(distance)) byDistance.set(distance, []);
+    byDistance.get(distance).push(elevation);
+  });
+  const vertices = [...byDistance.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([distance, elevations]) => [distance, quantileFromSorted(elevations.sort((a, b) => a - b), 0.5)]);
+  if (vertices.length < 5) return null;
+  let lowest = 0;
+  vertices.forEach(([, elevation], index) => {
+    if (elevation < vertices[lowest][1]) lowest = index;
+  });
+  const left = vertices.slice(0, lowest);
+  const right = vertices.slice(lowest + 1);
+  if (left.length < 2 || right.length < 2) return null;
+  const thalweg = vertices[lowest][1];
+  const leftBank = Math.max(...left.map(([, elevation]) => elevation));
+  const rightBank = Math.max(...right.map(([, elevation]) => elevation));
+  const bankfull = Math.min(leftBank, rightBank);
+  if (!(bankfull > thalweg)) return null;
+  return { thalweg, leftBank, rightBank, bankfull, depth: bankfull - thalweg };
+}
+
+// ANA segment identifiers read station__from__to__consistency__segment_count__...
+export function parseRatingSegmentId(segmentId) {
+  const parts = String(segmentId || '').split('__');
+  const level = Number(parts[3]);
+  const match = String(parts[4] || '').match(/^(\d+)_(\d+)$/);
+  return {
+    consistencyLevel: Number.isInteger(level) && parts[3] !== '' ? level : null,
+    segment: match ? Number(match[1]) : null,
+    segments: match ? Number(match[2]) : null,
+  };
+}
+
+// Q = a (H - h0)^n with H in metres, written with the sign of h0 folded in.
+export function ratingEquationParts(coefficientA, coefficientH0, coefficientN, format = String) {
+  const h0 = Number(coefficientH0);
+  return {
+    base: `Q = ${format(Number(coefficientA))} (H ${h0 < 0 ? '+' : '−'} ${format(Math.abs(h0))})`,
+    exponent: format(Number(coefficientN)),
+  };
+}
+
