@@ -70,12 +70,12 @@ test.describe('station report export', () => {
     expect(methodsStart).toBeGreaterThan(documentXml.indexOf('All reconstructed station events'));
   });
 
-  test('mentions the discharge axis only when the chart draws it', async ({ page }) => {
-    // On 2020-01-01 the plotted stages lie below the latest rating curve; in September 2011 they lie within it.
-    const withoutAxis = (await downloadReport(page, 'en', '2020-01-01')).get('word/document.xml').toString('utf8');
-    expect(withoutAxis).not.toContain('The right axis shows discharge');
-    const withAxis = (await downloadReport(page, 'en', '2011-09-09')).get('word/document.xml').toString('utf8');
-    expect(withAxis).toContain('The right axis shows discharge');
+  test('mentions the discharge axis exactly when the chart draws it', async ({ page }) => {
+    for (const date of ['2020-01-01', '2011-09-09', '1935-06-01']) {
+      const documentXml = (await downloadReport(page, 'en', date)).get('word/document.xml').toString('utf8');
+      const hasAxis = await page.evaluate(() => Boolean(window.Chart.getChart('timeseriesChart')?.scales?.yDischarge));
+      expect(documentXml.includes('The right axis shows discharge'), date).toBe(hasAxis);
+    }
   });
 
   test('prints chart text at 16 pt or larger', async ({ page }) => {
