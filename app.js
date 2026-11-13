@@ -11,6 +11,11 @@ import {
   ratingDischarge,
   ratingEquationParts,
   ratingStageFromDischarge,
+  addMonths,
+  dateFromDayNumber,
+  dateInWindow,
+  dayNumber,
+  monthStarts,
   validCurveDischarge,
   REPORT_MIN_CHART_FONT_PT,
   REPORT_PAGE,
@@ -20,7 +25,9 @@ import {
   provisionalRuns,
   scaleToWidth,
   summarizeDailyStations,
-} from './core.js?v=9';
+  timelineWindow,
+  yearlyStationCoverage,
+} from './core.js?v=10';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
@@ -82,6 +89,10 @@ const TEXT = {
     previousDateLabel: 'Dia anterior',
     nextDateLabel: 'Próximo dia',
     dateScrubberLabel: 'Controle de rolagem da data',
+    timelineTitle: 'Linha do tempo',
+    timelineNote: 'Faixa sombreada: estações cujo registro abrange cada ano',
+    timelineOverviewLabel: 'Escolher o ano no registro completo',
+    timelineDetailLabel: 'Escolher o dia na janela de 12 meses',
     maximizeChart: 'Ampliar gráfico',
     chartUnavailable: 'Este gráfico ainda não está disponível.',
     crossSectionTableTitle: 'Levantamentos das seções',
@@ -491,6 +502,10 @@ const TEXT = {
     previousDateLabel: 'Previous day',
     nextDateLabel: 'Next day',
     dateScrubberLabel: 'Date scroll control',
+    timelineTitle: 'Timeline',
+    timelineNote: 'Shaded band: stations whose record spans each year',
+    timelineOverviewLabel: 'Choose the year in the full record',
+    timelineDetailLabel: 'Choose the day in the 12-month window',
     maximizeChart: 'Maximize chart',
     chartUnavailable: 'This chart is not available yet.',
     crossSectionTableTitle: 'Cross-section surveys',
@@ -1203,6 +1218,8 @@ const state = {
     returnFocus: null,
   },
   dateScrubberTimer: null,
+  timelineWindow: null,
+  timelineCoverage: null,
   dateStepHoldTimer: null,
   dateStepRepeatTimer: null,
   dateStepSuppressClick: false,
@@ -2572,6 +2589,7 @@ function getStatusInfo(stationCode, dateString) {
 function applyStaticTranslations() {
   const keys = [
     'brandTitle', 'brandSubtitle', 'dateLabel', 'theoryButton', 'layersButton', 'fitMapButton', 'exportCsvButton', 'shareButton', 'actionsMenuLabel',
+    'timelineTitle', 'timelineNote',
     'crossSectionTableTitle', 'crossSectionTableNote', 'thSurveyDate', 'thThalweg', 'thLeftBank', 'thRightBank', 'thBankfull', 'thDepth', 'ratingTableTitle', 'ratingTableNote', 'thValidFrom', 'thValidTo', 'thSegment', 'thConsistency', 'thStageRange', 'thEquation', 'exportCrossSectionTableCsvButton', 'exportRatingTableCsvButton',
     'eyebrowLabel', 'heroTitle', 'heroText', 'statStationsLabel', 'statRangeLabel', 'statLatestLabel',
     'filtersTitle', 'searchLabel', 'statusFilterLabel', 'basisFilterLabel', 'qaFilterLabel', 'crossSectionFilterLabel',
@@ -2603,6 +2621,9 @@ function applyStaticTranslations() {
     dateScrubber.setAttribute('aria-label', text('dateScrubberLabel'));
     dateScrubber.setAttribute('title', text('dateScrubberLabel'));
   }
+  byId('timelineOverview')?.setAttribute('aria-label', text('timelineOverviewLabel'));
+  byId('timelineDetail')?.setAttribute('aria-label', text('timelineDetailLabel'));
+  if (state.manifest) renderTimeline(true);
   // The legend is built in code, so it must be redrawn whenever the language changes,
   // including the language read from the URL on first load.
   if (byId('legendItems')) renderLegend();
@@ -3225,6 +3246,165 @@ function dateForScrubberOffset(offset) {
   return new Date(dayNumber * 86400000).toISOString().slice(0, 10);
 }
 
+function timelinePercent(value, start, end) {
+  const span = dayNumber(end) - dayNumber(start);
+  return span > 0 ? ((dayNumber(value) - dayNumber(start)) / span) * 100 : 0;
+}
+
+function renderTimelineOverview() {
+  const minDate = state.manifest.supported_date_min;
+  const maxDate = state.manifest.supported_date_max;
+  const firstYear = Number(minDate.slice(0, 4));
+  const lastYear = Number(maxDate.slice(0, 4));
+  if (!state.timelineCoverage && state.stations?.length) {
+    state.timelineCoverage = yearlyStationCoverage(state.stations, firstYear, lastYear);
+  }
+  const counts = state.timelineCoverage || [0];
+  const peak = Math.max(1, ...counts);
+  const points = counts.map((count, index) => {
+    const x = timelinePercent(`${firstYear + index}-07-01`, minDate, maxDate) * 10;
+    return `${Math.min(1000, Math.max(0, x)).toFixed(1)},${(100 - (count / peak) * 92).toFixed(1)}`;
+  });
+  byId('timelineDensityPath')?.setAttribute('d', `M0,100 L${points.join(' L')} L1000,100 Z`);
+
+  const decades = byId('timelineDecades');
+  if (decades) {
+    const labels = [];
+    for (let year = Math.ceil(firstYear / 20) * 20; year <= lastYear; year += 20) labels.push(year);
+    decades.innerHTML = labels
+      .map((year) => `<span style="left:${timelinePercent(`${year}-01-01`, minDate, maxDate).toFixed(2)}%">${year}</span>`)
+      .join('');
+  }
+  const overview = byId('timelineOverview');
+  if (overview) overview.max = String(dayNumber(maxDate) - dayNumber(minDate));
+}
+
+function renderTimelineDetail() {
+  const range = state.timelineWindow;
+  const months = byId('timelineMonths');
+  if (months) {
+    const formatter = new Intl.DateTimeFormat(state.lang === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', timeZone: 'UTC' });
+    months.innerHTML = monthStarts(range.start, range.end)
+      .map((month) => {
+        const isYearStart = month.endsWith('-01-01');
+        const label = isYearStart ? month.slice(0, 4) : formatter.format(new Date(`${month}T00:00:00Z`)).replace('.', '');
+        return `<span class="${isYearStart ? 'is-year' : ''}" style="left:${timelinePercent(month, range.start, range.end).toFixed(2)}%">${label}</span>`;
+      })
+      .join('');
+  }
+  const detail = byId('timelineDetail');
+  if (detail) detail.max = String(dayNumber(range.end) - dayNumber(range.start));
+  const minDate = state.manifest.supported_date_min;
+  const maxDate = state.manifest.supported_date_max;
+  const windowNode = byId('timelineWindow');
+  if (windowNode) {
+    const left = timelinePercent(range.start, minDate, maxDate);
+    windowNode.style.left = `${left}%`;
+    windowNode.style.width = `${Math.max(0.6, timelinePercent(range.end, minDate, maxDate) - left)}%`;
+  }
+}
+
+// Shows a date on the timeline without loading data; used while dragging.
+function previewTimelineDate(dateString) {
+  const range = state.timelineWindow;
+  const minDate = state.manifest.supported_date_min;
+  const overview = byId('timelineOverview');
+  const detail = byId('timelineDetail');
+  if (overview) {
+    overview.value = String(dayNumber(dateString) - dayNumber(minDate));
+    overview.style.setProperty('--timeline-progress', `${timelinePercent(dateString, minDate, state.manifest.supported_date_max)}%`);
+  }
+  const position = timelinePercent(dateString, range.start, range.end);
+  if (detail) {
+    detail.value = String(dayNumber(dateString) - dayNumber(range.start));
+    detail.style.setProperty('--timeline-progress', `${position}%`);
+  }
+  const bubble = byId('timelineBubble');
+  if (bubble) {
+    bubble.textContent = formatDate(dateString);
+    // Keep the bubble inside the dock near the ends of the window.
+    bubble.style.left = `calc(9px + (100% - 18px) * ${Math.min(0.94, Math.max(0.06, position / 100)).toFixed(4)})`;
+  }
+  const selected = byId('timelineSelected');
+  if (selected) selected.textContent = formatDate(dateString);
+  byId('datePicker').value = dateString;
+}
+
+function renderTimeline(force = false) {
+  if (!state.manifest || !byId('timelineDock')) return;
+  const date = state.selectedDate || state.manifest.supported_date_max;
+  const minDate = state.manifest.supported_date_min;
+  const maxDate = state.manifest.supported_date_max;
+  if (force || !state.timelineCoverage) renderTimelineOverview();
+  if (force || !dateInWindow(date, state.timelineWindow)) {
+    state.timelineWindow = timelineWindow(date, minDate, maxDate);
+    renderTimelineDetail();
+  }
+  previewTimelineDate(date);
+}
+
+function scheduleTimelineDate(dateString) {
+  if (state.dateScrubberTimer) window.clearTimeout(state.dateScrubberTimer);
+  state.dateScrubberTimer = window.setTimeout(async () => {
+    state.dateScrubberTimer = null;
+    if (dateString !== state.selectedDate) await setSelectedDate(dateString);
+  }, 140);
+}
+
+async function commitTimelineDate(dateString) {
+  if (state.dateScrubberTimer) {
+    window.clearTimeout(state.dateScrubberTimer);
+    state.dateScrubberTimer = null;
+  }
+  if (dateString !== state.selectedDate) await setSelectedDate(dateString);
+}
+
+function wireTimeline() {
+  const overview = byId('timelineOverview');
+  const detail = byId('timelineDetail');
+  if (!overview || !detail) return;
+  // The legend floats above the dock, so it needs the dock's current height.
+  const dock = byId('timelineDock');
+  if (dock && 'ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      dock.parentElement.style.setProperty('--timeline-dock-height', `${dock.offsetHeight}px`);
+      map?.invalidateSize();
+    }).observe(dock);
+  }
+  const overviewDate = () => dateFromDayNumber(dayNumber(state.manifest.supported_date_min) + Number(overview.value));
+  const detailDate = () => dateFromDayNumber(dayNumber(state.timelineWindow.start) + Number(detail.value));
+  overview.addEventListener('input', () => {
+    const dateString = overviewDate();
+    if (!dateInWindow(dateString, state.timelineWindow)) {
+      state.timelineWindow = timelineWindow(dateString, state.manifest.supported_date_min, state.manifest.supported_date_max);
+      renderTimelineDetail();
+    }
+    previewTimelineDate(dateString);
+    scheduleTimelineDate(dateString);
+  });
+  overview.addEventListener('change', () => commitTimelineDate(overviewDate()));
+  // In the full record, arrows move one calendar month and Page Up/Down one year.
+  const overviewKeys = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageDown: -12, PageUp: 12 };
+  overview.addEventListener('keydown', (event) => {
+    const months = overviewKeys[event.key];
+    if (!months) return;
+    event.preventDefault();
+    const dateString = clampDateToSupportedRange(addMonths(state.selectedDate, months));
+    if (!dateInWindow(dateString, state.timelineWindow)) {
+      state.timelineWindow = timelineWindow(dateString, state.manifest.supported_date_min, state.manifest.supported_date_max);
+      renderTimelineDetail();
+    }
+    previewTimelineDate(dateString);
+    scheduleTimelineDate(dateString);
+  });
+  detail.addEventListener('input', () => {
+    const dateString = detailDate();
+    previewTimelineDate(dateString);
+    scheduleTimelineDate(dateString);
+  });
+  detail.addEventListener('change', () => commitTimelineDate(detailDate()));
+}
+
 function updateDateNavigation() {
   const datePicker = byId('datePicker');
   if (!datePicker) return;
@@ -3255,6 +3435,7 @@ function updateDateNavigation() {
   const timelineEnd = byId('dateTimelineEnd');
   if (timelineStart) timelineStart.textContent = minDate ? minDate.slice(0, 4) : '-';
   if (timelineEnd) timelineEnd.textContent = maxDate ? maxDate.slice(0, 4) : '-';
+  renderTimeline();
 
   const prevButton = byId('prevDateButton');
   const nextButton = byId('nextDateButton');
@@ -6203,6 +6384,7 @@ function wireEvents() {
       if (scrubberDate !== state.selectedDate) await setSelectedDate(scrubberDate);
     });
   }
+  wireTimeline();
   const prevDateButton = byId('prevDateButton');
   const nextDateButton = byId('nextDateButton');
   bindDateStepButton(prevDateButton, -1);
