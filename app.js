@@ -5075,7 +5075,6 @@ async function exportStationReport() {
     const qaPanelParts = await safeBuildQaPanelPartImages(state.selectedData.qa.panel_png);
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
-    const latestCurve = latestRatingCurve(state.selectedData);
     const docEvents = normalizedEventRows(state.selectedData);
     const qaFlagsText = (state.selectedData.qa.flags || []).length ? state.selectedData.qa.flags.map(flagLabel).join('; ') : text('noQaFlags');
     const report = TEXT[state.lang].report;
@@ -5186,7 +5185,8 @@ async function exportStationReport() {
       figureCaption(caption),
     ] : []);
 
-    const timeseriesCaption = latestCurve && state.selectedData.summary.threshold_value_type === 'stage_cm'
+    // The discharge axis is drawn only when plotted stages fall inside the latest curve's range.
+    const timeseriesCaption = state.charts.timeseriesChart?.scales?.yDischarge
       ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave mais recente.' : 'The right axis shows discharge estimated from the latest rating curve.'}`
       : report.chartCaption;
 
