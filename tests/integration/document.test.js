@@ -20,6 +20,6 @@ describe('published document', () => {
   });
 
   it('versions the internal core module to prevent mixed cached bundles', () => {
-    expect(applicationSource).toContain("from './core.js?v=6';");
+    expect(applicationSource).toContain("from './core.js?v=9';");
   });
 });
