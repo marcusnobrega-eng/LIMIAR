@@ -228,3 +228,23 @@ describe('file names', () => {
   });
 });
 
+
+describe('provisional (raw ANA) days', () => {
+  const ranges = [[3, 5], [10, 10], [20, 30]];
+
+  it('finds offsets inside, at the edges of, and outside the ranges', () => {
+    expect([2, 3, 4, 5, 6].map((offset) => core.isProvisionalOffset(ranges, offset))).toEqual([false, true, true, true, false]);
+    expect([9, 10, 11, 19, 20, 30, 31].map((offset) => core.isProvisionalOffset(ranges, offset))).toEqual([false, true, false, false, true, true, false]);
+    expect(core.isProvisionalOffset(ranges, 0)).toBe(false);
+    expect(core.isProvisionalOffset([], 4)).toBe(false);
+    expect(core.isProvisionalOffset(undefined, 4)).toBe(false);
+    expect(core.isProvisionalOffset([[4, 4]], 4)).toBe(true);
+  });
+
+  it('groups consecutive provisional entries into index runs', () => {
+    expect(core.provisionalRuns([false, true, true, false, true, false, false, true])).toEqual([[1, 2], [4, 4], [7, 7]]);
+    expect(core.provisionalRuns([true, true, true])).toEqual([[0, 2]]);
+    expect(core.provisionalRuns([false, false])).toEqual([]);
+    expect(core.provisionalRuns([])).toEqual([]);
+  });
+});

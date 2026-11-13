@@ -910,6 +910,19 @@ h3 {
   color: var(--accent);
 }
 
+.pill.provisional {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+}
+
+.data-version-note {
+  margin: -4px 0 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-wrap: pretty;
+}
+
 .status-pill.normal {
   background: rgba(47, 127, 143, 0.12);
   color: var(--normal);

@@ -229,3 +229,29 @@ export function fileNamePart(value, maxLength = 60) {
     .replace(/_+$/, '');
 }
 
+
+// Raw (level 1) ANA days arrive as sorted, non-overlapping [first, last] day-offset ranges.
+export function isProvisionalOffset(ranges, offset) {
+  let low = 0;
+  let high = (ranges?.length || 0) - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const [first, last] = ranges[middle];
+    if (offset < first) high = middle - 1;
+    else if (offset > last) low = middle + 1;
+    else return true;
+  }
+  return false;
+}
+
+// Index ranges [start, end] of consecutive true values, for shading provisional days on a chart.
+export function provisionalRuns(flags) {
+  const runs = [];
+  flags.forEach((flag, index) => {
+    if (!flag) return;
+    const last = runs[runs.length - 1];
+    if (last && last[1] === index - 1) last[1] = index;
+    else runs.push([index, index]);
+  });
+  return runs;
+}
