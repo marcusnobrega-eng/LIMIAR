@@ -350,3 +350,32 @@ describe('axis ranges', () => {
     expect(core.niceAxisRange([])).toBeNull();
   });
 });
+
+describe('bankfull discharge map', () => {
+  it('decodes a delta-encoded line into latitude and longitude pairs', () => {
+    const line = core.decodeBankfullLine([3, 1, 480, 520, 1054, 1089, -50000, -10000, 100, 0, 50, -20], 1000);
+    expect(line).toMatchObject({ cls: 3, outside: true, qMin: 480, qMax: 520, areaMin: 1054, areaMax: 1089 });
+    expect(line.latlngs).toEqual([[-10, -50], [-10, -49.9], [-10.02, -49.85]]);
+  });
+
+  it('rejects lines without two points or a valid scale', () => {
+    expect(core.decodeBankfullLine([0, 0, 1, 1, 1, 1, 10, 10], 1000)).toBeNull();
+    expect(core.decodeBankfullLine([0, 0, 1, 1, 1, 1, 10, 10, 1, 1], 0)).toBeNull();
+  });
+
+  it('adds smaller rivers as the map zooms in', () => {
+    const tiers = [{ name: 'ge100k' }, { name: '10k_100k' }, { name: '2k_10k' }, { name: '1k_2k' }];
+    expect(core.bankfullTiersForZoom(tiers, 4)).toEqual(['ge100k', '10k_100k']);
+    expect(core.bankfullTiersForZoom(tiers, 6)).toEqual(['ge100k', '10k_100k', '2k_10k']);
+    expect(core.bankfullTiersForZoom(tiers, 8)).toEqual(['ge100k', '10k_100k', '2k_10k', '1k_2k']);
+  });
+});
+
+describe('significant figures', () => {
+  it('rounds model estimates to a number of significant figures', () => {
+    expect(core.roundSignificant(193505, 2)).toBe(190000);
+    expect(core.roundSignificant(487.2, 2)).toBe(490);
+    expect(core.roundSignificant(1088.9, 3)).toBe(1090);
+    expect(core.roundSignificant(0, 2)).toBe(0);
+  });
+});

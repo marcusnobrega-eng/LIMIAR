@@ -376,3 +376,38 @@ export function niceAxisRange(values, padding = 0.08) {
   if (low >= 0 && min < 0) min = 0;
   return { min, max };
 }
+
+// Bankfull discharge map layer. Each line of a tier file is
+// [class, outside, qMin, qMax, areaMin, areaMax, x0, y0, dx1, dy1, ...] with integer coordinates
+// in units of 1/scale degrees and every point after the first stored as a difference.
+export function decodeBankfullLine(line, scale) {
+  if (!Array.isArray(line) || line.length < 10 || !(scale > 0)) return null;
+  const [cls, outside, qMin, qMax, areaMin, areaMax] = line;
+  const latlngs = [];
+  let x = 0;
+  let y = 0;
+  for (let k = 6; k + 1 < line.length; k += 2) {
+    x += line[k];
+    y += line[k + 1];
+    latlngs.push([y / scale, x / scale]);
+  }
+  return { cls, outside: outside === 1, qMin, qMax, areaMin, areaMax, latlngs };
+}
+
+// Tiers drawn at a zoom level: the largest rivers always, smaller ones as the map zooms in.
+export const BANKFULL_TIER_MIN_ZOOM = { ge100k: 0, '10k_100k': 0, '2k_10k': 6, '1k_2k': 7 };
+
+export function bankfullTiersForZoom(tiers, zoom) {
+  return (tiers || [])
+    .filter((tier) => zoom >= (BANKFULL_TIER_MIN_ZOOM[tier.name] ?? Infinity))
+    .map((tier) => tier.name);
+}
+
+// Rounds to a number of significant figures, for model estimates whose error is a factor, not a
+// fixed number of units.
+export function roundSignificant(value, digits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return number;
+  const magnitude = 10 ** (Math.floor(Math.log10(Math.abs(number))) - digits + 1);
+  return Math.round(number / magnitude) * magnitude;
+}

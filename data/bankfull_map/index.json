@@ -1,0 +1,72 @@
+{
+ "generated_at": "2026-11-13T01:28:43Z",
+ "source": "LIMIAR national Ridge model of bankfull discharge",
+ "units": "m3/s",
+ "classes": {
+  "edges": [
+   200,
+   500,
+   1000,
+   2000,
+   5000,
+   10000,
+   20000,
+   50000
+  ],
+  "colours": [
+   "#d1edb3",
+   "#abdeb7",
+   "#7acbbc",
+   "#55bec1",
+   "#35aac3",
+   "#1d90c0",
+   "#2073b2",
+   "#2352a3",
+   "#1b2c80"
+  ],
+  "labels": [
+   "< 200",
+   "200 to 500",
+   "500 to 1,000",
+   "1,000 to 2,000",
+   "2,000 to 5,000",
+   "5,000 to 10,000",
+   "10,000 to 20,000",
+   "20,000 to 50,000",
+   "≥ 50,000"
+  ]
+ },
+ "tiers": [
+  {
+   "name": "ge100k",
+   "min_area_km2": 100000,
+   "max_area_km2": null,
+   "file": "tier_ge100k.json",
+   "lines": 1215
+  },
+  {
+   "name": "10k_100k",
+   "min_area_km2": 10000,
+   "max_area_km2": 100000,
+   "file": "tier_10k_100k.json",
+   "lines": 2962
+  },
+  {
+   "name": "2k_10k",
+   "min_area_km2": 2000,
+   "max_area_km2": 10000,
+   "file": "tier_2k_10k.json",
+   "lines": 4106
+  },
+  {
+   "name": "1k_2k",
+   "min_area_km2": 1000,
+   "max_area_km2": 2000,
+   "file": "tier_1k_2k.json",
+   "lines": 3555
+  }
+ ],
+ "reaches": 82351,
+ "river_km": 245884,
+ "outside_training_share": 0.0469
+}
