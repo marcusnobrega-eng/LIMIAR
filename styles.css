@@ -1042,6 +1042,51 @@ h3 {
   border-radius: 50%;
 }
 
+.legend-bankfull {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.legend-subtitle {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.legend-bar {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.legend-bar-ticks {
+  position: relative;
+  height: 1.1em;
+  margin: 3px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.legend-bar-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.bankfull-popup small {
+  display: block;
+  margin-top: 4px;
+}
+
+.bankfull-outside {
+  color: var(--warning-ink, #8a4b00);
+}
+
 .detail-panel {
   background: rgba(246, 248, 244, 0.74);
 }

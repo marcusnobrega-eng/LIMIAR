@@ -1,5 +1,8 @@
 import {
   addDays,
+  bankfullTiersForZoom,
+  decodeBankfullLine,
+  roundSignificant,
   fileNamePart,
   bankfullFromProfile,
   continuousDates,
@@ -27,7 +30,7 @@ import {
   summarizeDailyStations,
   timelineWindow,
   yearlyStationCoverage,
-} from './core.js?v=10';
+} from './core.js?v=12';
 import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=2';
 
 const STATUS_MAP = {
@@ -279,6 +282,17 @@ const TEXT = {
     layerSummaryText: 'Mostra o cartão com a estação selecionada sobre o mapa.',
     layerLegend: 'Legenda',
     layerLegendText: 'Mostra a legenda de classes e cores no canto do mapa.',
+    layerBankfull: 'Vazão de margens plenas (modelo)',
+    layerBankfullText: 'Mostra os rios coloridos pela vazão de margens plenas estimada pelo modelo nacional.',
+    bankfullLegendTitle: 'Vazão de margens plenas (m³/s)',
+    bankfullLegendNote: 'Estimativa do modelo nacional para {reaches} trechos de rio com área de drenagem de pelo menos 1.000 km². Rios menores aparecem ao aproximar o mapa.',
+    bankfullLoading: 'Carregando o mapa de vazão de margens plenas...',
+    bankfullError: 'Não foi possível carregar o mapa de vazão de margens plenas.',
+    bankfullPopupTitle: 'Vazão de margens plenas (modelo)',
+    bankfullPopupArea: 'Área de drenagem',
+    bankfullPopupNote: 'Estimativa do modelo a partir de atributos da bacia, não uma medição em estação.',
+    bankfullPopupOutside: 'Ao menos uma variável deste trecho está fora da faixa das estações de treinamento.',
+    bankfullTo: 'a',
     imageExpandButton: 'Ampliar figura',
     imageOverlayTitle: 'Painel hidráulico detalhado',
     closeLabel: 'Fechar',
@@ -692,6 +706,17 @@ const TEXT = {
     layerSummaryText: 'Show the selected-station summary card over the map.',
     layerLegend: 'Legend',
     layerLegendText: 'Show the class/color legend in the map corner.',
+    layerBankfull: 'Bankfull discharge (model)',
+    layerBankfullText: 'Show rivers coloured by the bankfull discharge of the national model.',
+    bankfullLegendTitle: 'Bankfull discharge (m³/s)',
+    bankfullLegendNote: 'National model estimate for {reaches} river reaches with a drainage area of at least 1,000 km². Smaller rivers appear as you zoom in.',
+    bankfullLoading: 'Loading the bankfull discharge map...',
+    bankfullError: 'The bankfull discharge map could not be loaded.',
+    bankfullPopupTitle: 'Bankfull discharge (model)',
+    bankfullPopupArea: 'Drainage area',
+    bankfullPopupNote: 'Model estimate from catchment attributes, not a gauge measurement.',
+    bankfullPopupOutside: 'At least one input of this reach lies outside the range of the training stations.',
+    bankfullTo: 'to',
     imageExpandButton: 'Expand figure',
     imageOverlayTitle: 'Detailed hydraulic panel',
     closeLabel: 'Close',
@@ -1212,6 +1237,14 @@ const state = {
     stations: true,
     summary: true,
     legend: true,
+    bankfull: false,
+  },
+  bankfull: {
+    index: null,
+    indexPromise: null,
+    tiers: {},
+    tierPromises: {},
+    status: 'idle',
   },
   guide: {
     activeStep: 0,
@@ -1886,10 +1919,15 @@ function ensureMap() {
   setRegionLoading('map', true);
   map = L.map('map', {
     preferCanvas: true,
+    // A few pixels of tolerance so that thin river lines can be clicked.
+    renderer: L.canvas({ tolerance: 5 }),
     zoomControl: false,
   }).setView([-14.5, -52.5], 4);
   // Top right keeps the zoom buttons clear of the selected-day card.
   L.control.zoom({ position: 'topright' }).addTo(map);
+  map.on('zoomend', () => {
+    if (state.mapVisibility.bankfull) syncBankfullLayer();
+  });
 
   Object.entries(BASEMAP_DEFS).forEach(([key, config]) => {
     state.baseLayers[key] = L.tileLayer(config.url, {
@@ -1903,6 +1941,7 @@ function ensureMap() {
   activeLayer.addTo(map);
   window.setTimeout(() => setRegionLoading('map', false), 1800);
   renderMap();
+  if (state.mapVisibility.bankfull) syncBankfullLayer();
   return map;
 }
 
@@ -1941,6 +1980,7 @@ function applyMapVisibility() {
   if (selectedCard) selectedCard.hidden = !state.mapVisibility.summary;
   if (legendCard) legendCard.hidden = !state.mapVisibility.legend;
   renderMap();
+  syncBankfullLayer();
 }
 
 function renderLayersModal() {
@@ -1988,6 +2028,13 @@ function renderLayersModal() {
           <span>
             <strong>${text('layerLegend')}</strong>
             <small>${text('layerLegendText')}</small>
+          </span>
+        </label>
+        <label class="layer-option">
+          <input type="checkbox" data-layer-visibility="bankfull" ${state.mapVisibility.bankfull ? 'checked' : ''} />
+          <span>
+            <strong>${text('layerBankfull')}</strong>
+            <small>${text('layerBankfullText')}</small>
           </span>
         </label>
       </section>
@@ -2812,6 +2859,7 @@ function renderLegend() {
   note.className = 'legend-note';
   note.textContent = text('legendPointNote');
   legend.appendChild(note);
+  renderBankfullLegend(legend);
 }
 
 function currentFilters() {
@@ -2923,6 +2971,185 @@ function renderMap() {
   });
   state.markersLayer.addTo(map);
   state.markerBounds = markers.length ? L.featureGroup(markers).getBounds() : null;
+}
+
+// ---- Bankfull discharge map (model) ------------------------------------------------------------
+
+const BANKFULL_MAP_ROOT = 'data/bankfull_map/';
+const BANKFULL_TIER_WEIGHT = { ge100k: 3.2, '10k_100k': 2.1, '2k_10k': 1.4, '1k_2k': 1 };
+
+// The model's typical error factor is about 1.9, so discharge is shown with two significant
+// figures and drainage area with three.
+function bankfullRange(low, high, digits) {
+  const a = roundSignificant(low, digits);
+  const b = roundSignificant(high, digits);
+  return a === b ? formatNumber(a) : `${formatNumber(a)} ${text('bankfullTo')} ${formatNumber(b)}`;
+}
+
+function bankfullPopup(line) {
+  const range = bankfullRange(line.qMin, line.qMax, 2);
+  const area = bankfullRange(line.areaMin, line.areaMax, 3);
+  return `
+    <div class="marker-popup bankfull-popup">
+      <strong>${text('bankfullPopupTitle')}</strong>
+      <div>${range} m³/s</div>
+      <small>${text('bankfullPopupArea')} ${area} km²</small>
+      <small>${text('bankfullPopupNote')}</small>
+      ${line.outside ? `<small class="bankfull-outside">${text('bankfullPopupOutside')}</small>` : ''}
+    </div>
+  `;
+}
+
+async function loadBankfullIndex() {
+  const bankfull = state.bankfull;
+  if (bankfull.index || bankfull.indexPromise) return bankfull.indexPromise || bankfull.index;
+  bankfull.indexPromise = fetch(`${BANKFULL_MAP_ROOT}index.json`, { cache: 'no-cache' })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((index) => {
+      bankfull.index = index;
+      return index;
+    })
+    .finally(() => {
+      bankfull.indexPromise = null;
+    });
+  return bankfull.indexPromise;
+}
+
+async function loadBankfullTier(tier) {
+  const bankfull = state.bankfull;
+  if (bankfull.tiers[tier.name]) return bankfull.tiers[tier.name];
+  if (bankfull.tierPromises[tier.name]) return bankfull.tierPromises[tier.name];
+  bankfull.tierPromises[tier.name] = fetch(`${BANKFULL_MAP_ROOT}${tier.file}`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((payload) => {
+      const colours = bankfull.index.classes.colours;
+      const group = L.layerGroup();
+      payload.lines.forEach((raw) => {
+        const line = decodeBankfullLine(raw, payload.scale);
+        if (!line || line.latlngs.length < 2) return;
+        L.polyline(line.latlngs, {
+          color: colours[line.cls],
+          weight: BANKFULL_TIER_WEIGHT[tier.name] || 1,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round',
+        })
+          .bindPopup(() => bankfullPopup(line))
+          .addTo(group);
+      });
+      bankfull.tiers[tier.name] = group;
+      return group;
+    })
+    .finally(() => {
+      delete bankfull.tierPromises[tier.name];
+    });
+  return bankfull.tierPromises[tier.name];
+}
+
+async function syncBankfullLayer() {
+  if (!map) return;
+  const bankfull = state.bankfull;
+  if (!state.mapVisibility.bankfull) {
+    Object.values(bankfull.tiers).forEach((group) => {
+      group.remove();
+    });
+    bankfull.status = 'idle';
+    renderLegend();
+    return;
+  }
+  bankfull.status = 'loading';
+  renderLegend();
+  try {
+    const index = await loadBankfullIndex();
+    const wanted = new Set(bankfullTiersForZoom(index.tiers, map.getZoom()));
+    // The largest rivers come first, so the national pattern shows before the small tributaries.
+    for (const tier of index.tiers) {
+      if (!state.mapVisibility.bankfull) return;
+      if (wanted.has(tier.name)) {
+        const group = await loadBankfullTier(tier);
+        if (state.mapVisibility.bankfull && !map.hasLayer(group)) {
+          group.addTo(map);
+          // Rivers and stations share the map canvas, which draws in the order layers are added,
+          // so the stations are redrawn to stay on top.
+          renderMap();
+        }
+      } else if (bankfull.tiers[tier.name]) {
+        bankfull.tiers[tier.name].remove();
+      }
+    }
+    bankfull.status = 'ready';
+  } catch (error) {
+    bankfull.status = 'error';
+    window.LIMIAR_OBSERVABILITY?.error?.(error, { area: 'bankfull-map' });
+  }
+  renderLegend();
+}
+
+function renderBankfullLegend(legend) {
+  const bankfull = state.bankfull;
+  if (!state.mapVisibility.bankfull) return;
+  const section = document.createElement('div');
+  section.className = 'legend-bankfull';
+  const title = document.createElement('span');
+  title.className = 'legend-subtitle';
+  title.textContent = text('bankfullLegendTitle');
+  section.appendChild(title);
+  if (bankfull.status === 'error') {
+    const note = document.createElement('p');
+    note.className = 'legend-note';
+    note.setAttribute('role', 'alert');
+    note.textContent = text('bankfullError');
+    section.appendChild(note);
+  } else if (!bankfull.index) {
+    const note = document.createElement('p');
+    note.className = 'legend-note';
+    note.setAttribute('aria-busy', 'true');
+    note.textContent = text('bankfullLoading');
+    section.appendChild(note);
+  } else {
+    // A stepped colour bar, as in the paper's map, keeps the legend short on small screens.
+    const { colours, edges, labels } = bankfull.index.classes;
+    const bar = document.createElement('div');
+    bar.className = 'legend-bar';
+    bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label', labels.map(localizeBankfullLabel).join(', '));
+    colours.forEach((colour, k) => {
+      const cell = document.createElement('span');
+      cell.style.background = colour;
+      cell.title = localizeBankfullLabel(labels[k]);
+      bar.appendChild(cell);
+    });
+    section.appendChild(bar);
+    const ticks = document.createElement('div');
+    ticks.className = 'legend-bar-ticks';
+    ticks.setAttribute('aria-hidden', 'true');
+    const compact = new Intl.NumberFormat(state.lang === 'pt' ? 'pt-BR' : 'en-US', { notation: 'compact' });
+    edges.forEach((edge, k) => {
+      const tick = document.createElement('span');
+      tick.style.left = `${((k + 1) / colours.length) * 100}%`;
+      tick.textContent = compact.format(edge);
+      ticks.appendChild(tick);
+    });
+    section.appendChild(ticks);
+    const note = document.createElement('p');
+    note.className = 'legend-note';
+    note.textContent = text('bankfullLegendNote').replace('{reaches}', formatNumber(bankfull.index.reaches));
+    section.appendChild(note);
+  }
+  legend.appendChild(section);
+}
+
+function localizeBankfullLabel(label) {
+  // Labels come as "500 to 1,000", "< 200" or "≥ 50,000" in English number format.
+  return label
+    .replace(/(\d[\d,]*)/g, (value) => formatNumber(Number(value.replace(/,/g, ''))))
+    .replace(' to ', ` ${text('bankfullTo')} `);
 }
 
 function renderGlobalStats() {
