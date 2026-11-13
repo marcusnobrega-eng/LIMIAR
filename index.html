@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=20" />
   </head>
   <body class="app-loading">
     <header class="topbar">
@@ -598,6 +598,16 @@
       </section>
     </div>
 
+    <div class="overlay" id="chartOverlay" hidden>
+      <div class="overlay-backdrop" data-overlay-close="chartOverlay"></div>
+      <section class="overlay-panel chart-panel" role="dialog" aria-modal="true" aria-labelledby="chartOverlayTitle">
+        <button class="overlay-close" id="closeChartButton" type="button" aria-label="Fechar">&times;</button>
+        <h2 id="chartOverlayTitle">-</h2>
+        <p id="chartOverlaySubtitle"></p>
+        <div class="chart-panel-wrap"><canvas id="chartOverlayCanvas"></canvas></div>
+      </section>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script>
@@ -607,6 +617,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/chartjs/chart.umd.min.js"></script>
     <script src="vendor/docx/index.umd.js"></script>
-  <script type="module" src="app.js?v=27"></script>
+  <script type="module" src="app.js?v=29"></script>
   </body>
 </html>
