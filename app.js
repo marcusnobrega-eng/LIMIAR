@@ -12,6 +12,7 @@ import {
   scaleToWidth,
   summarizeDailyStations,
 } from './core.js?v=4';
+import { chartModelFromChartJs, chartPlaceholder, injectNativeCharts } from './office-charts.js?v=1';
 
 const STATUS_MAP = {
   n: 'normal',
@@ -284,6 +285,9 @@ const TEXT = {
       methodText: 'O LIMIAR compara o valor diário observado com os limiares válidos naquele período. A evidência hidráulica observada define o limiar principal quando disponível. Nas demais estações, o Q2 estatístico define o limiar. O sistema apresenta registros históricos e não opera alertas em tempo real.',
       statusSection: 'Situação na data selecionada',
       chartsGroup: 'Gráficos da estação',
+      nativeChartsNote: 'Estes são gráficos nativos do Word. Clique com o botão direito em um gráfico para mudar eixos, cores e fontes, ou escolha Editar Dados para abrir os valores no Excel.',
+      windows: { 30: '30 dias em torno da data selecionada', 90: '90 dias em torno da data selecionada', full: 'registro completo' },
+      bandLabels: { low: 'Cota de margens plenas, percentil 10', median: 'Cota de margens plenas, mediana', high: 'Cota de margens plenas, percentil 90' },
       page: { label: 'Página', of: 'de' },
       methods: {
         title: 'Métodos e incerteza',
@@ -624,6 +628,9 @@ const TEXT = {
       methodText: 'LIMIAR compares each observed daily value with the thresholds valid for that period. Observed hydraulic evidence defines the primary threshold when available. At the remaining stations, statistical Q2 defines the threshold. The system presents historical records and does not issue real-time warnings.',
       statusSection: 'Selected-day conditions',
       chartsGroup: 'Station charts',
+      nativeChartsNote: 'These are native Word charts. Right-click a chart to change its axes, colours, and fonts, or choose Edit Data to open its values in Excel.',
+      windows: { 30: '30 days around the selected date', 90: '90 days around the selected date', full: 'full record' },
+      bandLabels: { low: 'Bankfull stage, 10th percentile', median: 'Bankfull stage, median', high: 'Bankfull stage, 90th percentile' },
       page: { label: 'Page', of: 'of' },
       methods: {
         title: 'Methods and uncertainty',
@@ -5056,25 +5063,89 @@ function reportMethodsChildren(heading, subheading) {
   ];
 }
 
+const REPORT_TIMESERIES_RANGES = ['30', '90', 'full'];
+
+// The data and options of an on-screen chart, as the native Word chart needs them.
+function chartJsSource(chartKey) {
+  const chart = state.charts[chartKey];
+  if (!chart) return null;
+  const options = chart.config._config.options || {};
+  const datasets = [...chart.data.datasets];
+  // The shaded threshold band is drawn by a plugin; in Word it becomes three lines.
+  const band = options.plugins?.thresholdBand;
+  const xs = datasets.flatMap((dataset) => (dataset.data || []).map((point) => Number(point?.x))).filter(Number.isFinite);
+  if (band?.enabled && xs.length) {
+    const labels = TEXT[state.lang].report.bandLabels;
+    const line = (key, value, color, dash) => ({
+      label: labels[key],
+      data: [{ x: Math.min(...xs), y: value }, { x: Math.max(...xs), y: value }],
+      borderColor: color,
+      borderDash: dash,
+      borderWidth: 1.4,
+    });
+    datasets.push(
+      line('low', band.low, 'rgba(208, 75, 69, 0.7)', [2, 3]),
+      line('median', band.median, '#8f1d21', [7, 4]),
+      line('high', band.high, 'rgba(208, 75, 69, 0.7)', [2, 3]),
+    );
+  }
+  return { type: chart.config.type, labels: chart.data.labels || [], datasets, options };
+}
+
+function safeChartModel(source) {
+  try {
+    return source ? chartModelFromChartJs(source) : null;
+  } catch (error) {
+    console.warn('Could not prepare a native chart.', error);
+    return null;
+  }
+}
+
+function timeseriesReportCaption() {
+  const report = TEXT[state.lang].report;
+  // The discharge axis is drawn only when some plotted stages can be converted.
+  return state.charts.timeseriesChart?.scales?.yDischarge
+    ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia; sem curva válida na data, usa-se a mais recente (linha pontilhada).' : 'The right axis shows discharge estimated with the rating curve valid on each day; where none is valid on the date, the most recent curve is used (dotted line).'}`
+    : report.chartCaption;
+}
+
+// Every chart in the report, as a native chart model and as a PNG for the fallback.
+async function collectReportFigures() {
+  const report = TEXT[state.lang].report;
+  const figures = [];
+  const add = async (chartKey, title, caption, dateFormat = 'yyyy') => {
+    const source = chartJsSource(chartKey);
+    if (!source) return;
+    figures.push({
+      index: figures.length + 1,
+      title,
+      caption,
+      dateFormat,
+      layout: REPORT_FIGURES[chartKey],
+      model: safeChartModel(source),
+      bytes: await safeChartToBytes(chartKey, REPORT_FIGURES[chartKey]),
+    });
+  };
+  for (const range of REPORT_TIMESERIES_RANGES) {
+    state.currentRange = range;
+    renderTimeseriesChart(state.selectedData);
+    await add('timeseriesChart', `${report.chartSection} · ${report.windows[range]}`, timeseriesReportCaption(), range === 'full' ? 'yyyy' : 'yyyy-mm-dd');
+  }
+  await add('crossSectionChart', report.crossSectionSection, report.crossSectionCaption);
+  await add('dynamicDailyChart', report.dynamicDailySection, report.dynamicDailyCaption);
+  await add('ratingCurveChart', report.ratingCurveSection, report.ratingCurveCaption);
+  await add('evidenceChart', report.evidenceSection, report.evidenceCaption);
+  await add('seasonalityChart', report.seasonalitySection, report.seasonalityCaption);
+  return figures;
+}
+
 async function exportStationReport() {
   if (!state.selectedData || !window.docx) return;
   const previousRange = state.currentRange;
-  let forcedFullRange = false;
   try {
     const docx = window.docx;
-    if (byId('timeseriesChart').hidden) {
-      state.currentRange = 'full';
-      forcedFullRange = true;
-      document.querySelectorAll('.range-button').forEach((node) => {
-        node.classList.toggle('active', node.dataset.range === 'full');
-      });
-      renderTimeseriesChart(state.selectedData);
-    }
     renderStationCharts(state.selectedData, true);
-    const figureBytes = {};
-    for (const [chartKey, layout] of Object.entries(REPORT_FIGURES)) {
-      figureBytes[chartKey] = await safeChartToBytes(chartKey, layout);
-    }
+    const figures = await collectReportFigures();
     const qaPanelParts = await safeBuildQaPanelPartImages(state.selectedData.qa.panel_png);
     const details = buildDayDetails(state.selectedData, state.selectedDate);
     const basisKey = resolvedBasisKey(details.basis, state.selectedData.summary.threshold_basis);
@@ -5182,21 +5253,22 @@ async function exportStationReport() {
       after: 200,
     });
 
-    const chartFigure = (chartKey, title, caption) => (figureBytes[chartKey] ? [
-      subheading(title),
-      figureParagraph(figureBytes[chartKey], REPORT_FIGURES[chartKey], title),
-      figureCaption(caption),
-    ] : []);
-
-    // The discharge axis is drawn only when plotted stages fall inside the latest curve's range.
-    const timeseriesCaption = state.charts.timeseriesChart?.scales?.yDischarge
-      ? `${report.chartCaption} ${state.lang === 'pt' ? 'O eixo direito mostra a vazão estimada com a curva-chave válida em cada dia; sem curva válida na data, usa-se a mais recente (linha pontilhada).' : 'The right axis shows discharge estimated with the rating curve valid on each day; where none is valid on the date, the most recent curve is used (dotted line).'}`
-      : report.chartCaption;
+    // A native chart replaces its placeholder after packing; images are the fallback.
+    const figureBlock = (figure, useNative) => {
+      if (useNative ? !figure.model : !figure.bytes) return [];
+      return [
+        subheading(figure.title),
+        useNative
+          ? reportParagraph(chartPlaceholder(figure.index), { alignment: docx.AlignmentType.CENTER, keepNext: true })
+          : figureParagraph(figure.bytes, figure.layout, figure.title),
+        figureCaption(figure.caption),
+      ];
+    };
 
     const qaImageWidth = REPORT_FIGURES.timeseriesChart.imageWidth;
     const footerText = `${state.selectedData.metadata.station_name} (${state.selectedData.metadata.station_code}) · ${formatDate(state.selectedDate)}`;
 
-    const doc = new docx.Document({
+    const buildDocument = (useNative) => new docx.Document({
       styles: {
         default: {
           document: {
@@ -5239,12 +5311,8 @@ async function exportStationReport() {
         ]),
         reportSection(report.chartsGroup, footerText, [
           heading(report.chartsGroup),
-          ...chartFigure('timeseriesChart', report.chartSection, timeseriesCaption),
-          ...chartFigure('crossSectionChart', report.crossSectionSection, report.crossSectionCaption),
-          ...chartFigure('dynamicDailyChart', report.dynamicDailySection, report.dynamicDailyCaption),
-          ...chartFigure('ratingCurveChart', report.ratingCurveSection, report.ratingCurveCaption),
-          ...chartFigure('evidenceChart', report.evidenceSection, report.evidenceCaption),
-          ...chartFigure('seasonalityChart', report.seasonalitySection, report.seasonalityCaption),
+          ...(useNative ? [reportParagraph(report.nativeChartsNote, { color: REPORT_THEME.muted, after: 160 })] : []),
+          ...figures.flatMap((figure) => figureBlock(figure, useNative)),
         ]),
         reportSection(report.qaSection, footerText, [
           heading(report.qaSection),
@@ -5276,7 +5344,28 @@ async function exportStationReport() {
         reportSection(report.methods.title, footerText, reportMethodsChildren(heading, subheading)),
       ],
     });
-    const blob = await docx.Packer.toBlob(doc);
+    let blob;
+    try {
+      const packed = await docx.Packer.toBlob(buildDocument(true));
+      const charts = figures.filter((figure) => figure.model).map((figure) => ({
+        index: figure.index,
+        model: figure.model,
+        title: figure.title,
+        widthEmu: figure.layout.imageWidth * 9525,
+        heightEmu: figure.layout.imageHeight * 9525,
+        options: {
+          dateFormat: figure.dateFormat,
+          lang: state.lang === 'pt' ? 'pt-BR' : 'en-US',
+          font: REPORT_FONT.body,
+          boldFont: REPORT_FONT.bold,
+          size: REPORT_MIN_CHART_FONT_PT,
+        },
+      }));
+      blob = await injectNativeCharts(await packed.arrayBuffer(), charts);
+    } catch (error) {
+      console.warn('Could not embed native Word charts; using images instead.', error);
+      blob = await docx.Packer.toBlob(buildDocument(false));
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -5288,13 +5377,11 @@ async function exportStationReport() {
     console.error(error);
     showToast(TEXT[state.lang].toasts.reportError);
   } finally {
-    if (forcedFullRange) {
-      state.currentRange = previousRange;
-      document.querySelectorAll('.range-button').forEach((node) => {
-        node.classList.toggle('active', node.dataset.range === previousRange);
-      });
-      renderTimeseriesChart(state.selectedData);
-    }
+    state.currentRange = previousRange;
+    document.querySelectorAll('.range-button').forEach((node) => {
+      node.classList.toggle('active', node.dataset.range === previousRange);
+    });
+    renderTimeseriesChart(state.selectedData);
   }
 }
 

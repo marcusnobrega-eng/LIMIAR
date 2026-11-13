@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { readZip } from './zip.js';
 
-const POINT_EMU = 12700;
-const TEXT_WIDTH_EMU = ((11906 - 2 * 1440) / 20) * POINT_EMU;
+const TEXT_WIDTH_EMU = ((11906 - 2 * 1440) / 20) * 12700;
 
 async function downloadReport(page, lang, date = '2020-01-01') {
   await page.goto(`/?date=${date}&lang=${lang}&station=83250000&guide=0`);
@@ -78,22 +77,39 @@ test.describe('station report export', () => {
     }
   });
 
-  test('prints chart text at 16 pt or larger', async ({ page }) => {
+  test('embeds native, editable Word charts with 16 pt text and their data', async ({ page }) => {
     const entries = await downloadReport(page, 'en');
     const documentXml = entries.get('word/document.xml').toString('utf8');
+    const contentTypes = entries.get('[Content_Types].xml').toString('utf8');
+    const relationships = entries.get('word/_rels/document.xml.rels').toString('utf8');
+    const charts = [...entries.keys()].filter((name) => /^word\/charts\/chart\d+\.xml$/.test(name));
+
+    // Three time-series windows plus the five other station charts.
+    expect(charts.length).toBe(8);
+    expect(documentXml).not.toContain('[[LIMIAR_CHART_');
+    for (const window of ['30 days around the selected date', '90 days around the selected date', 'full record']) {
+      expect(documentXml).toContain(`Primary time series · ${window}`);
+    }
+    expect(documentXml).toContain('These are native Word charts.');
+
+    for (const name of charts) {
+      const index = name.match(/chart(\d+)\.xml$/)[1];
+      const chartXml = entries.get(name).toString('utf8');
+      expect(chartXml).toContain('<c:chartSpace');
+      expect(chartXml).toContain('sz="1600"');
+      expect(chartXml).toContain('typeface="Helvetica Light"');
+      expect(contentTypes).toContain(`/word/charts/chart${index}.xml`);
+      expect(relationships).toContain(`Target="charts/chart${index}.xml"`);
+      const workbook = readZip(entries.get(`word/embeddings/Microsoft_Excel_Worksheet${index}.xlsx`));
+      expect(workbook.get('xl/worksheets/sheet1.xml').toString('utf8')).toContain('<sheetData><row r="1">');
+    }
 
     const extents = [...documentXml.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/g)].map((match) => Number(match[1]));
-    expect(extents.length).toBeGreaterThan(0);
     for (const width of extents) expect(width).toBeLessThanOrEqual(TEXT_WIDTH_EMU);
-
-    // Charts are drawn at 4 pixels per printed point, so their 16-unit fonts print at 16 pt.
-    const chartWidthEmu = 450 * POINT_EMU;
-    expect(extents.filter((width) => width === chartWidthEmu).length).toBeGreaterThanOrEqual(1);
-    const chartImages = [...entries.entries()]
-      .filter(([name]) => /^word\/media\/.+\.png$/.test(name))
-      .map(([, data]) => data.readUInt32BE(16))
-      .filter((pixelWidth) => pixelWidth === 450 * 4);
-    expect(chartImages.length).toBeGreaterThanOrEqual(1);
+    const ids = [...documentXml.matchAll(/<wp:docPr id="(\d+)"/g)].map((match) => match[1]);
+    const chartIds = ids.filter((id) => Number(id) >= 5000);
+    expect(chartIds).toHaveLength(8);
+    expect(new Set(chartIds).size).toBe(8);
   });
 
   test('translates headers and footers in Portuguese', async ({ page }) => {
